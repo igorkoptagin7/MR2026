@@ -1,53 +1,319 @@
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 #include <cstdio>
+
 using namespace std;
 
 using RUB = int;
 
+enum investment_strategy {
+    fixed_deposit,
+    stocks
+};
+
 struct Person {
     RUB cash;
     RUB salary;
+    RUB savings;
+
+    bool has_job;
+    int work_experience;
+
+    int health;
+    int education;
+
+    investment_strategy strategy;
+};
+
+struct Family {
+    bool married;
+    int children;
 };
 
 Person alice;
+Person bob;
+Family family;
 
-void simulation()
+
+bool job_interview(const Person& person)//собеседование
 {
-    int year = 2026;
-    int month = 9;
+    int chance = 50;
 
-    while (!(year == 2027 && month == 9))
+    chance += person.education / 5;
+
+    if (person.work_experience > 0)
+    {
+        chance += 10;
+    }
+
+    int result = rand() % 100;
+
+    return result < chance;
+}
+
+
+void find_job(Person& person)//есть ли работа
+{
+    if (person.has_job)
+    {
+        return;
+    }
+
+    if (job_interview(person))
+    {
+        person.has_job = true;
+        person.salary = 80'000;
+    }
+}
+
+
+void salary(const int year, const int month)//зарплата
+{
+    find_job(alice);
+    find_job(bob);
+
+    if (alice.has_job)
     {
         alice.cash += alice.salary;
+    }
 
-        cout << "Year: " << year << ", Month: " << month << endl;
+    if (bob.has_job)
+    {
+        bob.cash += bob.salary;
+    }
+}
 
-        month++;
 
-        if (month > 12)
+void update_work_experience()//опыт работы
+{
+    if (alice.has_job)
+    {
+        ++alice.work_experience;
+    }
+
+    if (bob.has_job)
+    {
+        ++bob.work_experience;
+    }
+}
+
+
+void deposit_for_person(Person& person)//накопление
+{
+    RUB deposit_amount = person.salary / 10;
+
+    if (deposit_amount > person.cash)
+    {
+        deposit_amount = person.cash;
+    }
+
+    person.cash -= deposit_amount;
+    person.savings += deposit_amount;
+
+    if (person.strategy == fixed_deposit)
+    {
+        // Фиксированный доход 1% в месяц
+        RUB income = person.savings / 100;
+        person.savings += income;
+    }
+
+    if (person.strategy == stocks)
+    {
+        // Доход от акций от -1% до +2%
+        int stock_change = rand() % 4 - 1;
+
+        RUB income = person.savings * stock_change / 100;
+        person.savings += income;
+
+        if (person.savings < 0)
         {
-            month = 1;
-            year++;
+            person.savings = 0;
         }
     }
 }
 
-void alice_init()
+
+void deposit()//вклад или акции
+{
+    deposit_for_person(alice);
+    deposit_for_person(bob);
+}
+
+
+void inflation()//инфляция
+{
+    // Здесь позже появится инфляция
+}
+
+
+void housing()//жилье
+{
+    // Здесь позже появится аренда или ипотека
+}
+
+
+void food()//качество еды
+{
+    // Здесь позже появятся расходы на еду
+}
+
+
+void health()//здроровье
+{
+    // Здесь позже появится изменение здоровья
+}
+
+
+void entertainment()//развлечения
+{
+    // Здесь позже появятся развлечения
+}
+
+
+void education()//образование
+{
+    // Здесь позже появится дополнительное образование
+}
+
+
+void dating()//свидания
+{
+    // Здесь позже появятся свидания
+}
+
+
+void family_update()//создание семьи
+{
+    // Здесь позже появится создание семьи
+}
+
+
+void financial_check()//финансовое положение
+{
+    // Здесь позже появится оценка финансового положения
+}
+
+
+void happiness_check()//счастье
+{
+    // Здесь позже появится оценка счастья
+}
+
+
+void simulation()//симуляция
+{
+    int year = 2026;
+    int month = 9;
+
+    while (not (year == 2036 and month == 9))
+    {
+        inflation();
+
+        salary(year, month);
+        deposit();
+
+        housing();
+        food();
+
+        health();
+
+        entertainment();
+        education();
+
+        dating();
+        family_update();
+
+        financial_check();
+        happiness_check();
+
+        if (month == 12 or month == 3 or month == 6 or month == 9)
+        {
+            update_work_experience();
+        }
+
+        ++month;
+
+        if (month == 13)
+        {
+            ++year;
+            month = 1;
+        }
+    }
+}
+
+
+void alice_init()//начало алисы
 {
     alice.cash = 20'000;
-    alice.salary = 80'000;
+    alice.salary = 0;
+    alice.savings = 0;
+    alice.strategy = fixed_deposit;
+
+    alice.has_job = false;
+    alice.work_experience = 0;
+
+    alice.health = 70;
+    alice.education = 80;
 }
 
-void alice_print()
+
+void bob_init()//начало боба
 {
+    bob.cash = 20'000;
+    bob.salary = 0;
+    bob.savings = 0;
+    bob.strategy = stocks;
+
+    bob.has_job = false;
+    bob.work_experience = 0;
+
+    bob.health = 75;
+    bob.education = 75;
+}
+
+
+void family_init()//начало семьи
+{
+    family.married = false;
+    family.children = 0;
+}
+
+
+void alice_print()//вывод алисы
+{
+    printf("Alice salary = %d\n", alice.salary);
     printf("Alice cash = %d\n", alice.cash);
+    printf("Alice savings = %d\n", alice.savings);
+    printf("Alice work experience = %d quarters\n", alice.work_experience);
+    printf("Alice health = %d\n", alice.health);
+    printf("Alice education = %d\n", alice.education);
+    printf("Alice has job = %d\n", alice.has_job);
 }
 
-int main()
-{
-    alice_init();
-    simulation();
-    alice_print();
 
-    return 0;
+void bob_print()//вывод боба
+{
+    printf("Bob salary = %d\n", bob.salary);
+    printf("Bob cash = %d\n", bob.cash);
+    printf("Bob savings = %d\n", bob.savings);
+    printf("Bob work experience = %d quarters\n", bob.work_experience);
+    printf("Bob health = %d\n", bob.health);
+    printf("Bob education = %d\n", bob.education);
+    printf("Bob has job = %d\n", bob.has_job);
+}
+
+
+int main()//главная функция
+{
+    srand(time(NULL));
+
+    alice_init();
+    bob_init();
+    family_init();
+
+    simulation();
+
+    alice_print();
+    bob_print();
 }
