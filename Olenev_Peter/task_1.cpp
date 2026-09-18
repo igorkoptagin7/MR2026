@@ -18,6 +18,12 @@ struct Person{
     bool mortage;
     bool dismission;
 
+    // Для ипотеки
+    RUB mortgage_debt;
+    RUB mortgage_payment;
+    unsigned int mortgage_months_left;
+    int months_since_start;
+
 };
 
 struct Person peter;
@@ -27,69 +33,134 @@ void peter_init()
     peter.age=21;
     peter.cash=0;
     peter.salary=40000;
-    peter.health=75-21;
+    peter.health=60;
     peter.number_of_promotions=0;
     peter.dismission=false;
+
 }
 
 
-void peter_salary(unsigned int number_of_promotions, bool dismission)
+void peter_salary()
 {
-    if (dismission){
-        peter.salary=0;
+    if (peter.dismission){
+        peter.salary = 0;
+        return;
     }
-    else{
-        double salary_thousands =
-            (-1.0/3.0) * std::pow(number_of_promotions, 5)
-          + (25.0/12.0) * std::pow(number_of_promotions, 4)
-          + (25.0/6.0)  * std::pow(number_of_promotions, 3)
-          - (385.0/12.0)* std::pow(number_of_promotions, 2)
-          + (397.0/6.0) * number_of_promotions
+
+    double salary_thousands = 40.0;
+
+    if (peter.number_of_promotions <= 5){
+        salary_thousands =
+            (-1.0/3.0) * std::pow(peter.number_of_promotions, 5)
+          + (25.0/12.0) * std::pow(peter.number_of_promotions, 4)
+          + (25.0/6.0)  * std::pow(peter.number_of_promotions, 3)
+          - (385.0/12.0)* std::pow(peter.number_of_promotions, 2)
+          + (397.0/6.0) * peter.number_of_promotions
           + 40.0;
-        peter.salary = static_cast<RUB>(std::round(salary_thousands)) * 1000;
+    }
+    else {
+        salary_thousands = 350.0;
     }
 
+    if (salary_thousands < 0) salary_thousands = 0;
+    peter.salary = static_cast<RUB>(salary_thousands * 1000);
 }
 
-int world_tick(int year, int month)
+
+void world_tick(int *year, int *month)
 {
-    if (month==12){
-        ++year;
-        month=1;
+    if (*month==12){
+        ++(*year);
+        *month=1;
+        peter.health-=1;
     }
     else{
-        ++month;
+        ++(*month);
     }
-    return year, month;
 }
 
 
-bool peter_promotion_at_work() 
+void peter_promotion_at_work() 
 {
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(6, 54*12);
-    return dist(gen) == 1;
+    std::uniform_int_distribution<int> dist(1, 12*60);
+    for (int i = 1; i<=6; i++){
+        if (dist(gen) == 1){
+            peter.number_of_promotions++;
+            peter_salary();
+            break;
+        };
+    }
 }
 
 
-bool peter_dismissial_from_work()
+void peter_dismissial_from_work()
 {
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 54*12);
-    return dist(gen) == 1;
+    std::uniform_int_distribution<int> dist(1, 12*60);
+    if (dist(gen) == 1){
+        peter.dismission = true;
+    }
 }
 
 
-bool peter_disease()
+void peter_disease()
 {
     static std::random_device rd;
     static std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dist(12, 54*12);
-
 }
 
+void peter_mortage()
+{
+    if (peter.mortage){
+        if (peter.mortgage_months_left > 0){
+            if (peter.cash >= peter.mortgage_payment) {
+                peter.cash -= peter.mortgage_payment;
+            } else {
+                peter.cash = 0;
+            }
+
+            if (peter.mortgage_debt >= peter.mortgage_payment) {
+                peter.mortgage_debt -= peter.mortgage_payment;
+            } else {
+                peter.mortgage_debt = 0;
+            }
+            peter.mortgage_months_left--;
+        }
+        return;
+    }
+
+    const RUB FLAT_PRICE = 6500000ULL;
+    const RUB DOWN_PAYMENT = 2500000ULL;
+    const RUB LOAN_AMOUNT = FLAT_PRICE - DOWN_PAYMENT;
+    const double RATE = 0.155;
+    const unsigned int TERM_MONTHS = 10 * 12;
+
+    bool can_afford = (peter.cash >= DOWN_PAYMENT);
+    bool time_is_up = (peter.months_since_start >= 24);
+
+    if (!can_afford && !time_is_up) {
+        return;
+    }
+
+    if (!can_afford) {
+        peter.cash = DOWN_PAYMENT;
+    }
+
+    peter.cash -= DOWN_PAYMENT;
+
+    double r = RATE / 12.0;
+    double monthly =
+        LOAN_AMOUNT * r / (1.0 - std::pow(1.0 + r, -(double)TERM_MONTHS));
+
+    peter.mortage = true;
+    peter.mortgage_debt = LOAN_AMOUNT;
+    peter.mortgage_payment = static_cast<RUB>(monthly);
+    peter.mortgage_months_left = TERM_MONTHS;
+}
 
 void simulation()
 {
@@ -97,8 +168,15 @@ void simulation()
     int month=1;
     while(peter.health){
 
-        peter_salary(year, month);
+        peter_salary();
+        peter.cash+=peter.salary;
+        peter_dismissial_from_work();
+        peter_promotion_at_work();
+        peter.dismission = false;
+        peter_mortage();
+
         //peter_rent(year, month);              // аренда квартиры (растёт каждый год)
+        //peter_mortage()
         //peter_food(year, month);              // еда (зависит от инфляции)
         //peter_transport(year, month);         // метро/бензин
         //peter_utilities(year, month);         // свет, вода, интернет
@@ -129,11 +207,16 @@ void simulation()
         //peter_save_for_goal(year, month);     // цель: квартира/машина
         //peter_pension_fund(year, month);      // пенсионные накопления
         //peter_emergency_fund(year, month);    // подушка безопасности
-
-        world_tick(year, month);
+        printf("Год: %d, Месяц: %d | Зарплата: %llu руб. | Повышений: %u\n",
+               year, month, peter.salary, peter.number_of_promotions);
+        world_tick(&year, &month);
+        if (peter.health==0){
+            break;
+        };
     }
 }
 
 int main(){
+    peter_init();
     simulation();
 }
