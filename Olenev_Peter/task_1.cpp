@@ -17,16 +17,26 @@ struct Person{
     bool lizard;
     bool mortage;
     bool dismission;
+};
 
-    // Для ипотеки
-    RUB mortgage_debt;
-    RUB mortgage_payment;
-    unsigned int mortgage_months_left;
-    int months_since_start;
+struct Mortage{
+    RUB debt;
+    RUB payment;
+    RUB down_payment;
+    RUB principal_amount;
+    unsigned int month;
+    double interest_rate;
+};
 
+struct Time{
+    unsigned int month;
+    unsigned int year;
 };
 
 struct Person peter;
+struct Mortage mortage;
+struct Time time;
+
 
 void peter_init()
 {
@@ -38,6 +48,48 @@ void peter_init()
     peter.dismission=false;
 
 }
+
+
+void mortage_init()
+{
+    mortage.debt=6500000;
+    mortage.down_payment=2500000;
+    mortage.principal_amount=mortage.debt-mortage.down_payment;
+
+    mortage.interest_rate=0.155/12;
+    mortage.month=12*10;
+
+    RUB K = mortage.principal_amount;
+    double& r = mortage.interest_rate;
+    double t=std::pow(mortage.interest_rate/12.0+1, mortage.month);
+    mortage.payment=(K)*(r*t)/(t-1);
+}
+
+
+void time_init()
+{
+    time.year=2027;
+    time.month=1;
+}
+
+
+void peter_mortage()
+{
+    if (((time.year>=2029 and time.month>=1) or peter.cash>=mortage.down_payment)
+     and peter.salary>mortage.payment+30000 and mortage.principal_amount>0){
+        if (mortage.principal_amount<peter.cash*0.8){
+            peter.cash-=mortage.principal_amount;
+            mortage.principal_amount=0;
+        }
+        else{
+            mortage.principal_amount-=mortage.payment;
+            peter.cash-=mortage.payment;
+        }
+     }
+}
+
+
+
 
 
 void peter_salary()
@@ -67,15 +119,15 @@ void peter_salary()
 }
 
 
-void world_tick(int *year, int *month)
+void world_tick()
 {
-    if (*month==12){
-        ++(*year);
-        *month=1;
+    if (time.month==12){
+        ++(time.year);
+        time.month=1;
         peter.health-=1;
     }
     else{
-        ++(*month);
+        ++(time.month);
     }
 }
 
@@ -113,59 +165,10 @@ void peter_disease()
     std::uniform_int_distribution<int> dist(12, 54*12);
 }
 
-void peter_mortage()
-{
-    if (peter.mortage){
-        if (peter.mortgage_months_left > 0){
-            if (peter.cash >= peter.mortgage_payment) {
-                peter.cash -= peter.mortgage_payment;
-            } else {
-                peter.cash = 0;
-            }
 
-            if (peter.mortgage_debt >= peter.mortgage_payment) {
-                peter.mortgage_debt -= peter.mortgage_payment;
-            } else {
-                peter.mortgage_debt = 0;
-            }
-            peter.mortgage_months_left--;
-        }
-        return;
-    }
-
-    const RUB FLAT_PRICE = 6500000ULL;
-    const RUB DOWN_PAYMENT = 2500000ULL;
-    const RUB LOAN_AMOUNT = FLAT_PRICE - DOWN_PAYMENT;
-    const double RATE = 0.155;
-    const unsigned int TERM_MONTHS = 10 * 12;
-
-    bool can_afford = (peter.cash >= DOWN_PAYMENT);
-    bool time_is_up = (peter.months_since_start >= 24);
-
-    if (!can_afford && !time_is_up) {
-        return;
-    }
-
-    if (!can_afford) {
-        peter.cash = DOWN_PAYMENT;
-    }
-
-    peter.cash -= DOWN_PAYMENT;
-
-    double r = RATE / 12.0;
-    double monthly =
-        LOAN_AMOUNT * r / (1.0 - std::pow(1.0 + r, -(double)TERM_MONTHS));
-
-    peter.mortage = true;
-    peter.mortgage_debt = LOAN_AMOUNT;
-    peter.mortgage_payment = static_cast<RUB>(monthly);
-    peter.mortgage_months_left = TERM_MONTHS;
-}
 
 void simulation()
 {
-    int year=2027;
-    int month=1;
     while(peter.health){
 
         peter_salary();
@@ -207,9 +210,8 @@ void simulation()
         //peter_save_for_goal(year, month);     // цель: квартира/машина
         //peter_pension_fund(year, month);      // пенсионные накопления
         //peter_emergency_fund(year, month);    // подушка безопасности
-        printf("Год: %d, Месяц: %d | Зарплата: %llu руб. | Повышений: %u\n",
-               year, month, peter.salary, peter.number_of_promotions);
-        world_tick(&year, &month);
+
+        world_tick();
         if (peter.health==0){
             break;
         };
@@ -218,5 +220,7 @@ void simulation()
 
 int main(){
     peter_init();
+    mortage_init();
+    time_init();
     simulation();
 }
