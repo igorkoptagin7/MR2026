@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <cstdio>
+#include <cmath>
 
 using namespace std;
 
@@ -16,6 +17,7 @@ struct Person {
     RUB cash;
     RUB salary;
     RUB savings;
+    RUB rent_payment;
 
     bool has_job;
     int work_experience;
@@ -29,6 +31,15 @@ struct Person {
 struct Family {
     bool married;
     int children;
+
+    RUB apartment_price;
+    RUB rent_payment;
+
+    RUB mortgage_balance;
+    RUB mortgage_payment;
+
+    bool mortgage_started;
+    bool mortgage_paid;
 };
 
 Person alice;
@@ -140,6 +151,112 @@ void deposit()//вклад или акции
     deposit_for_person(bob);
 }
 
+RUB calculate_mortgage_payment(const RUB loan)//плата по ипотеке
+{
+    const double annual_interest = 0.06;
+    const double monthly_interest = annual_interest / 12;
+    const int mortgage_months = 120;
+
+    double payment = loan * monthly_interest /
+        (1 - pow(1 + monthly_interest, -mortgage_months));
+
+    return (RUB)payment;
+}
+
+void start_mortgage()//начало ипотеки
+{
+    const RUB down_payment = family.apartment_price * 40 / 100;
+    const RUB mortgage_amount = family.apartment_price - down_payment;
+
+    RUB total_money = alice.cash + alice.savings +
+                      bob.cash + bob.savings;
+
+    if (total_money < down_payment)
+    {
+        return;
+    }
+
+    RUB remaining_down_payment = down_payment;
+
+    RUB alice_cash_payment = alice.cash;
+
+    if (alice_cash_payment > remaining_down_payment)
+    {
+        alice_cash_payment = remaining_down_payment;
+    }
+
+    alice.cash -= alice_cash_payment;
+    remaining_down_payment -= alice_cash_payment;
+
+
+    RUB alice_savings_payment = alice.savings;
+
+    if (alice_savings_payment > remaining_down_payment)
+    {
+        alice_savings_payment = remaining_down_payment;
+    }
+
+    alice.savings -= alice_savings_payment;
+    remaining_down_payment -= alice_savings_payment;
+
+
+    RUB bob_cash_payment = bob.cash;
+
+    if (bob_cash_payment > remaining_down_payment)
+    {
+        bob_cash_payment = remaining_down_payment;
+    }
+
+    bob.cash -= bob_cash_payment;
+    remaining_down_payment -= bob_cash_payment;
+
+
+    if (remaining_down_payment > 0)
+    {
+        RUB bob_savings_payment = bob.savings;
+
+        if (bob_savings_payment > remaining_down_payment)
+        {
+            bob_savings_payment = remaining_down_payment;
+        }
+
+        bob.savings -= bob_savings_payment;
+        remaining_down_payment -= bob_savings_payment;
+    }
+
+
+    family.mortgage_balance = mortgage_amount;
+    family.mortgage_payment =
+        calculate_mortgage_payment(mortgage_amount);
+
+    family.mortgage_started = true;
+}
+
+void pay_mortgage()//платеж по ипотеке
+{
+    if (not family.mortgage_started or family.mortgage_paid)
+    {
+        return;
+    }
+
+    const double annual_interest = 0.06;
+    const double monthly_interest = annual_interest / 12;
+
+    RUB interest =
+        family.mortgage_balance * monthly_interest;
+
+    RUB principal =
+        family.mortgage_payment - interest;
+
+    if (principal >= family.mortgage_balance)
+    {
+        family.mortgage_balance = 0;
+        family.mortgage_paid = true;
+        return;
+    }
+
+    family.mortgage_balance -= principal;
+}
 
 void inflation()//инфляция
 {
@@ -149,9 +266,30 @@ void inflation()//инфляция
 
 void housing()//жилье
 {
-    // Здесь позже появится аренда или ипотека
-}
+    if (family.mortgage_started)
+    {
+        pay_mortgage();
+        return;
+    }
 
+
+    if (family.married)
+    {
+        alice.cash -= family.rent_payment / 2;
+        bob.cash -= family.rent_payment / 2;
+
+        start_mortgage();
+        return;
+    }
+
+
+    alice.cash -= alice.rent_payment;
+    bob.cash -= bob.rent_payment;
+
+
+    family.apartment_price +=
+        family.apartment_price * 3 / 1000;
+}
 
 void food()//качество еды
 {
@@ -253,6 +391,8 @@ void alice_init()//начало алисы
     alice.has_job = false;
     alice.work_experience = 0;
 
+    alice.rent_payment = 40'000;
+
     alice.health = 70;
     alice.education = 80;
 }
@@ -268,6 +408,8 @@ void bob_init()//начало боба
     bob.has_job = false;
     bob.work_experience = 0;
 
+    bob.rent_payment = 40'000;
+
     bob.health = 75;
     bob.education = 75;
 }
@@ -277,6 +419,15 @@ void family_init()//начало семьи
 {
     family.married = false;
     family.children = 0;
+
+    family.apartment_price = 15'000'000;
+    family.rent_payment = 60'000;
+
+    family.mortgage_balance = 0;
+    family.mortgage_payment = 0;
+
+    family.mortgage_started = false;
+    family.mortgage_paid = false;
 }
 
 
