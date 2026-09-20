@@ -4,6 +4,7 @@
 
 using RUB = unsigned long long int;
 using YEARS = unsigned int;
+using PERCENT = unsigned int;
 
 FILE* log_file = NULL;
 
@@ -12,36 +13,48 @@ FILE* log_file = NULL;
 struct Person{
     RUB cash;
     RUB salary;
-    YEARS age;
+    RUB base_salary;
+    RUB month_income;
     unsigned int number_of_promotions;
-    double health;
-    int childs;
-    bool car;
-    bool wife;
-    bool mortage;
     bool dismission;
+    RUB month_mortgage_payment;
+    RUB month_expenses;
+    bool month_promotion;
+    bool month_dismissed;
 
-    unsigned int mental;              // ментальное состояние, 0..100
-    RUB month_income;                 // сколько заработал за этот месяц
-    RUB month_mortgage_payment;       // сколько ушло на ипотеку за этот месяц
-    RUB month_expenses;               // прочие расходы за месяц
-    bool month_promotion;             // было ли повышение в этом месяце
-    bool month_dismissed;             // уволили ли в этом месяце
-    bool month_disease;               // болел ли в этом месяце
-    bool month_mortgage_paid_off;     // закрыл ли ипотеку в этом месяце
+    YEARS age;
+    double health;
+
+    int childs;
+    bool wife;
+    bool girlfriend;
+
+    bool car;
+    bool flat;
+
+    unsigned int mental;
+
+    bool month_disease;
+    bool month_mortgage_paid_off;
 
     // счётчики болезней
-    int count_cold;            // простуда
-    int count_angina;          // ангина
-    int count_broken_bone;     // перелом
-    int count_heart_attack;    // сердечный приступ
+    int count_cold;
+    int count_angina;
+    int count_broken_bone;
+    int count_heart_attack;
 
-    // что случилось в этом месяце (для лога)
+    // что случилось в этом месяце 
     const char* month_disease_name;   // название болезни
     double month_disease_damage;      // урон здоровью
 
     // причина последнего урона (для смерти)
-    const char* last_damage_source;   // "старости", "простуды", ...
+    const char* last_damage_source;
+};
+
+struct World{
+    PERCENT min_inflation;
+    PERCENT max_inflation;
+    PERCENT inflation;
 };
 
 struct Mortage{
@@ -61,32 +74,8 @@ struct Time{
 struct Person peter;
 struct Mortage mortage;
 struct Time time;
+struct World world;
 
-// ================== ПРОТОТИПЫ ФУНКЦИЙ ==================
-
-void peter_init();
-void peter_reset_month_stats();
-void mortage_init();
-void time_init();
-void peter_mortage();
-void peter_salary();
-void world_tick();
-void peter_promotion_at_work();
-void peter_dismissial_from_work();
-void peter_damage(double amount, const char* source);
-void peter_disease_cold();
-void peter_disease_angina();
-void peter_disease_broken_bone();
-void peter_disease_heart_attack();
-void peter_disease();
-const char* month_name(unsigned int m);
-void log_finance();
-void log_health();
-void log_age();
-void log_mental();
-void log_month_header();
-void log_month_report();
-void simulation();
 
 // ================== ИНИЦИАЛИЗАЦИЯ ==================
 
@@ -95,6 +84,7 @@ void peter_init()
     peter.age = 21;
     peter.cash = 0;
     peter.salary = 40000;
+    peter.base_salary = 40000;
     peter.health = 60.0;
     peter.number_of_promotions = 0;
     peter.dismission = false;
@@ -117,6 +107,7 @@ void peter_init()
     peter.month_disease_damage = 0.0;
 
     peter.last_damage_source = "старость";
+    peter.girlfriend = false;
 }
 
 
@@ -131,7 +122,6 @@ void peter_reset_month_stats()
     peter.month_mortgage_paid_off = false;
     peter.month_disease_name = "";
     peter.month_disease_damage = 0.0;
-    // last_damage_source НЕ сбрасываем — он хранит последнюю причину урона
 }
 
 
@@ -141,7 +131,6 @@ void mortage_init()
     mortage.down_payment = 2500000;
     mortage.principal_amount = mortage.debt - mortage.down_payment;
 
-    // месячная ставка
     mortage.interest_rate = 0.155 / 12;
     mortage.month = 12 * 10;
 
@@ -159,18 +148,47 @@ void time_init()
 }
 
 
+void world_init()
+{
+    world.min_inflation = 4;
+    world.max_inflation = 10;
+    world.inflation = 7;
+}
+
+
+// ================== ГЕНЕРАТОР ЧИСЕЛ ==================
+
+int number_generator(unsigned int min, unsigned int max)
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> distr(min, max);
+    return distr(gen);
+}
+
+
+// ================== МИР ==================
+
+void inflation_in_this_year()
+{
+    world.inflation = number_generator(world.min_inflation, world.max_inflation);
+}
+
+
 void world_tick()
 {
     if (time.month == 12){
         ++(time.year);
         time.month = 1;
         peter.age += 1;
+        inflation_in_this_year();
+        peter_salary_indexation();
     }
     else{
         ++(time.month);
     }
 
-    if (peter.health <= 0.0) return;   // уже мертвы — не трогаем здоровье и причину
+    if (peter.health <= 0.0) return;
 
     peter.health -= 1.0 / 12.0;
     if (peter.health < 0.0) peter.health = 0.0;
@@ -180,175 +198,237 @@ void world_tick()
     }
 }
 
-// Сделать флаг и плату даже когда нет зарплаты
-void peter_mortage()
-{
-    if (((time.year >= 2029 and time.month >= 1) or peter.cash >= mortage.down_payment)
-     and peter.month_income > mortage.payment + 30000 and mortage.principal_amount > 0){
+// ================== СЕМЬЯ =====================
 
-        if (mortage.principal_amount < peter.cash * 0.8){
-            peter.cash -= mortage.principal_amount;
-            peter.month_mortgage_payment += mortage.principal_amount;
-            mortage.principal_amount = 0;
-            peter.month_mortgage_paid_off = true;
-        }
-        else{
-            mortage.principal_amount -= mortage.payment;
-            peter.cash -= mortage.payment;
-            peter.month_mortgage_payment += mortage.payment;
-        }
+void peter_girlfriend()
+{
+    if (peter.girlfriend == false and number_generator(1, 50)==1){
+        peter.girlfriend = true;
+        peter.mental+=10;
+    }
+    if (peter.mental<30){
+        peter.girlfriend = false;
+    }
+    if (peter.girlfriend == true and number_generator(1, 500)==1){
+        peter.girlfriend = false;
+        peter.mental-=10;
     }
 }
 
-// ================== РАБОТА ==================
 
+void peter_married()
+{
+    if (peter.girlfriend_time == number_generator(24, 36) and peter.salary>=80000){
+        peter.married=true;
+        peter.girlfriend=false;
+        peter.girlfriend_possibility=false;
+    }
+}
+
+
+void peter_childrens()
+{
+    void;
+}
+
+
+void peter_grandchildrens()
+{
+    void;
+}
+
+
+
+// ================== РАБОТА ==================
 
 void peter_salary()
 {
     if (peter.dismission){
         peter.salary = 0;
+        return;
     }
-    else{
-        unsigned int x=peter.number_of_promotions;
-        double salary_thousands =
-            (-1.0/3.0) * std::pow(x, 5)
-          + (25.0/12.0) * std::pow(x, 4)
-          + (25.0/6.0)  * std::pow(x, 3)
-          - (385.0/12.0)* std::pow(x, 2)
-          + (397.0/6.0) * x
-          + 40.0;
-        peter.salary = static_cast<RUB>(salary_thousands * 1000);
+
+}
+
+
+void peter_vacation()
+{
+    void;
+}
+
+
+void peter_salary_after_promotion()
+{
+    unsigned int x = peter.number_of_promotions;
+    RUB new_base = 0;
+
+    if (x == 0){
+        new_base = static_cast<RUB>(number_generator(30, 50) * 1000ULL);
+    }
+    else if (x == 1){
+        new_base = static_cast<RUB>(number_generator(70, 90) * 1000ULL);
+    }
+    else if (x == 2){
+        new_base = static_cast<RUB>(number_generator(110, 130) * 1000ULL);
+    }
+    else if (x == 3){
+        new_base = static_cast<RUB>(number_generator(150, 170) * 1000ULL);
+    }
+    else if (x == 4){
+        new_base = static_cast<RUB>(number_generator(190, 210) * 1000ULL);
+    }
+    else {
+        new_base = static_cast<RUB>(number_generator(230, 300) * 1000ULL);
+    }
+
+    peter.base_salary = new_base;
+    peter.salary = peter.dismission ? 0 : peter.base_salary;
+}
+
+
+void peter_salary_indexation()
+{
+    if (peter.base_salary == 0) return;
+
+    peter.base_salary = static_cast<RUB>(
+        peter.base_salary * (1.0 + world.inflation / 100.0)
+    );
+
+    if (!peter.dismission){
+        peter.salary = peter.base_salary;
     }
 }
 
 
-void peter_promotion_at_work() 
+void peter_promotion_at_work()
 {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 12*60);
-    for (int i = 1; i <= 100; i++){
-        if (dist(gen) == 1 and peter.number_of_promotions<5){
-            peter.number_of_promotions++;
-            peter.month_promotion = true;
-            peter_salary();
-            break;
-        }
+    if (number_generator(1, 12 * 60) == 1){
+        peter.number_of_promotions++;
+        peter.month_promotion = true;
+        peter_salary_after_promotion();
     }
 }
 
 
 void peter_dismissial_from_work()
 {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 12*60);
-    if (dist(gen) == 1){
+    if (peter.dismission) return;
+
+    if (number_generator(1, 12 * 60) == 1){
         peter.dismission = true;
         peter.month_dismissed = true;
+        peter.salary = 0;
     }
 }
 
 
 void peter_find_work()
 {
-    if (peter.dismission==true){
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_int_distribution<int> dist(1, 3);
-        if (dist(gen) == 1){
-            peter.dismission = false;
-            peter.month_dismissed = false;
+    if (!peter.dismission) return;
+
+    if (number_generator(1, 12 * 60) == 1){
+        peter.dismission = false;
+        peter.salary = peter.base_salary;
+    }
+}
+
+
+// ================== РАСХОДЫ ==================
+
+void peter_mortage()
+{
+    if (mortage.principal_amount <= 0) return;
+
+    // досрочное погашение, если накоплений хватает
+    if (peter.cash >= mortage.principal_amount){
+        peter.cash -= mortage.principal_amount;
+        peter.month_mortgage_payment += mortage.principal_amount;
+        mortage.principal_amount = 0;
+        peter.month_mortgage_paid_off = true;
+        return;
+    }
+
+    // обычный платёж — только если есть деньги
+    if (peter.cash >= mortage.payment){
+        peter.cash -= mortage.payment;
+        peter.month_mortgage_payment += mortage.payment;
+
+        RUB interest = static_cast<RUB>(mortage.principal_amount * mortage.interest_rate);
+        if (mortage.payment > interest){
+            RUB principal_part = mortage.payment - interest;
+            if (principal_part > mortage.principal_amount){
+                principal_part = mortage.principal_amount;
+            }
+            mortage.principal_amount -= principal_part;
+        }
+
+        if (mortage.principal_amount == 0){
+            peter.month_mortgage_paid_off = true;
         }
     }
 }
+
+ void peter_food()
+ {
+    void;
+ }
 
 // ================== БОЛЕЗНИ ==================
 
 void peter_damage(double amount, const char* source)
 {
-    peter.health = peter.health - amount;
-
+    peter.health -= amount;
     if (peter.health < 0.0){
         peter.health = 0.0;
     }
-
     peter.last_damage_source = source;
 }
 
 
 void peter_disease_cold()
 {
-    // 20 раз за жизнь
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 36);
-
-    if (dist(gen) == 1){
-        peter.count_cold = peter.count_cold + 1;
-
+    if (number_generator(1, 36) == 1){
+        peter.count_cold++;
         peter.month_disease = true;
         peter.month_disease_name = "простуда";
         peter.month_disease_damage = 0.1;
-
-        peter_damage(peter.month_disease_damage, "простуда");
+        peter_damage(0.1, "простуда");
     }
 }
 
 
 void peter_disease_angina()
 {
-    // раз в жизнь
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 720);
-
-    if (dist(gen) == 1){
-        peter.count_angina = peter.count_angina + 1;
-
+    if (number_generator(1, 720) == 1){
+        peter.count_angina++;
         peter.month_disease = true;
         peter.month_disease_name = "ангина";
         peter.month_disease_damage = 0.5;
-
-        peter_damage(peter.month_disease_damage, "ангина");
+        peter_damage(0.5, "ангина");
     }
 }
 
 
 void peter_disease_broken_bone()
 {
-    // раз в 2 жизни
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 1440);
-
-    if (dist(gen) == 1){
-        peter.count_broken_bone = peter.count_broken_bone + 1;
-
+    if (number_generator(1, 1440) == 1){
+        peter.count_broken_bone++;
         peter.month_disease = true;
         peter.month_disease_name = "перелом кости";
         peter.month_disease_damage = 0.3;
-
-        peter_damage(peter.month_disease_damage, "перелом кости");
+        peter_damage(0.3, "перелом кости");
     }
 }
 
 
 void peter_disease_heart_attack()
 {
-    // раз в 10 жизней
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 7200);
-
-    if (dist(gen) == 1){
-        peter.count_heart_attack = peter.count_heart_attack + 1;
-
+    if (number_generator(1, 7200) == 1){
+        peter.count_heart_attack++;
         peter.month_disease = true;
         peter.month_disease_name = "сердечный приступ";
-        peter.month_disease_damage = 999.9;
-
-        peter_damage(peter.month_disease_damage, "сердечный приступ");
+        peter.month_disease_damage = 100.0;
+        peter_damage(100.0, "сердечный приступ");
     }
 }
 
@@ -368,7 +448,8 @@ void peter_disease()
     peter_disease_heart_attack();
 }
 
-// ================== ТЕКСТОВЫЙ ФАЙЛ ==================
+
+// ================== ЛОГ ==================
 
 const char* month_name(unsigned int m)
 {
@@ -491,24 +572,23 @@ void log_month_report()
     log_mental();
 }
 
+
 // ================== СИМУЛЯЦИЯ ==================
 
 void simulation()
 {
     do {
-
         peter_reset_month_stats();
 
-        peter_salary();
-        peter.cash += peter.salary;
-        peter.month_income += peter.salary;
-
         peter_dismissial_from_work();
-        peter_promotion_at_work();
         peter_find_work();
+        peter_promotion_at_work();
+        peter_salary();
+
+        peter.month_income = peter.salary;
+        peter.cash += peter.month_income;
 
         peter_disease();
-
         peter_mortage();
 
         log_month_report();
@@ -516,15 +596,14 @@ void simulation()
         world_tick();
     } while (peter.health > 0.0);
 
-
     fprintf(log_file, "\n");
     fprintf(log_file, "===========================================\n");
     fprintf(log_file, "                 СМЕРТЬ\n");
     fprintf(log_file, "===========================================\n");
     fprintf(log_file, "  причина:  %s\n", peter.last_damage_source);
     fprintf(log_file, "  возраст:  %u лет\n", peter.age);
-
 }
+
 
 int main()
 {
@@ -537,6 +616,7 @@ int main()
     peter_init();
     mortage_init();
     time_init();
+    world_init();
     simulation();
 
     fclose(log_file);
