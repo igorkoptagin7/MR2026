@@ -18,7 +18,6 @@ struct Person{
     int childs;
     bool car;
     bool wife;
-    bool lizard;
     bool mortage;
     bool dismission;
 
@@ -40,6 +39,9 @@ struct Person{
     // что случилось в этом месяце (для лога)
     const char* month_disease_name;   // название болезни
     double month_disease_damage;      // урон здоровью
+
+    // причина последнего урона (для смерти)
+    const char* last_damage_source;   // "старости", "простуды", ...
 };
 
 struct Mortage{
@@ -71,7 +73,7 @@ void peter_salary();
 void world_tick();
 void peter_promotion_at_work();
 void peter_dismissial_from_work();
-void peter_apply_damage(double amount);
+void peter_damage(double amount, const char* source);
 void peter_disease_cold();
 void peter_disease_angina();
 void peter_disease_broken_bone();
@@ -113,6 +115,8 @@ void peter_init()
 
     peter.month_disease_name = "";
     peter.month_disease_damage = 0.0;
+
+    peter.last_damage_source = "старость";
 }
 
 
@@ -127,6 +131,7 @@ void peter_reset_month_stats()
     peter.month_mortgage_paid_off = false;
     peter.month_disease_name = "";
     peter.month_disease_damage = 0.0;
+    // last_damage_source НЕ сбрасываем — он хранит последнюю причину урона
 }
 
 
@@ -159,15 +164,23 @@ void world_tick()
     if (time.month == 12){
         ++(time.year);
         time.month = 1;
-        peter.health -= 1.0;
         peter.age += 1;
     }
     else{
         ++(time.month);
     }
+
+    if (peter.health <= 0.0) return;   // уже мертвы — не трогаем здоровье и причину
+
+    peter.health -= 1.0 / 12.0;
+    if (peter.health < 0.0) peter.health = 0.0;
+
+    if (peter.health <= 0.0){
+        peter.last_damage_source = "старость";
+    }
 }
 
-
+// Сделать флаг и плату даже когда нет зарплаты
 void peter_mortage()
 {
     if (((time.year >= 2029 and time.month >= 1) or peter.cash >= mortage.down_payment)
@@ -194,28 +207,19 @@ void peter_salary()
 {
     if (peter.dismission){
         peter.salary = 0;
-        return;
     }
-
-    double salary_thousands = 40.0;
-
-    if (peter.number_of_promotions <= 5){
-        salary_thousands =
-            (-1.0/3.0) * std::pow(peter.number_of_promotions, 5)
-          + (25.0/12.0) * std::pow(peter.number_of_promotions, 4)
-          + (25.0/6.0)  * std::pow(peter.number_of_promotions, 3)
-          - (385.0/12.0)* std::pow(peter.number_of_promotions, 2)
-          + (397.0/6.0) * peter.number_of_promotions
+    else{
+        unsigned int x=peter.number_of_promotions;
+        double salary_thousands =
+            (-1.0/3.0) * std::pow(x, 5)
+          + (25.0/12.0) * std::pow(x, 4)
+          + (25.0/6.0)  * std::pow(x, 3)
+          - (385.0/12.0)* std::pow(x, 2)
+          + (397.0/6.0) * x
           + 40.0;
+        peter.salary = static_cast<RUB>(salary_thousands * 1000);
     }
-    else {
-        salary_thousands = 350.0;
-    }
-
-    if (salary_thousands < 0) salary_thousands = 0;
-    peter.salary = static_cast<RUB>(salary_thousands * 1000);
 }
-
 
 
 void peter_promotion_at_work() 
@@ -224,7 +228,7 @@ void peter_promotion_at_work()
     static std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dist(1, 12*60);
     for (int i = 1; i <= 100; i++){
-        if (dist(gen) == 1){
+        if (dist(gen) == 1 and peter.number_of_promotions<5){
             peter.number_of_promotions++;
             peter.month_promotion = true;
             peter_salary();
@@ -245,15 +249,31 @@ void peter_dismissial_from_work()
     }
 }
 
+
+void peter_find_work()
+{
+    if (peter.dismission==true){
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<int> dist(1, 3);
+        if (dist(gen) == 1){
+            peter.dismission = false;
+            peter.month_dismissed = false;
+        }
+    }
+}
+
 // ================== БОЛЕЗНИ ==================
 
-void peter_apply_damage(double amount)
+void peter_damage(double amount, const char* source)
 {
     peter.health = peter.health - amount;
 
     if (peter.health < 0.0){
         peter.health = 0.0;
     }
+
+    peter.last_damage_source = source;
 }
 
 
@@ -271,7 +291,7 @@ void peter_disease_cold()
         peter.month_disease_name = "простуда";
         peter.month_disease_damage = 0.1;
 
-        peter_apply_damage(0.1);
+        peter_damage(peter.month_disease_damage, "простуда");
     }
 }
 
@@ -290,7 +310,7 @@ void peter_disease_angina()
         peter.month_disease_name = "ангина";
         peter.month_disease_damage = 0.5;
 
-        peter_apply_damage(0.5);
+        peter_damage(peter.month_disease_damage, "ангина");
     }
 }
 
@@ -309,7 +329,7 @@ void peter_disease_broken_bone()
         peter.month_disease_name = "перелом кости";
         peter.month_disease_damage = 0.3;
 
-        peter_apply_damage(0.3);
+        peter_damage(peter.month_disease_damage, "перелом кости");
     }
 }
 
@@ -326,7 +346,9 @@ void peter_disease_heart_attack()
 
         peter.month_disease = true;
         peter.month_disease_name = "сердечный приступ";
-        peter.health = 0.0;
+        peter.month_disease_damage = 999.9;
+
+        peter_damage(peter.month_disease_damage, "сердечный приступ");
     }
 }
 
@@ -364,6 +386,7 @@ const char* month_name(unsigned int m)
         case 11: return "ноябрь";
         case 12: return "декабрь";
     }
+    return "";
 }
 
 
@@ -401,11 +424,10 @@ void log_health()
     fprintf(log_file, "  показатель: %.2f\n", peter.health);
 
     if (peter.month_disease){
-        fprintf(log_file, "  болезнь: %s (урон %.2f)\n",
+        fprintf(log_file, "  болезнь: %s (урон %.1f)\n",
                 peter.month_disease_name,
                 peter.month_disease_damage);
     }
-
     fprintf(log_file, "  простуд за жизнь:    %d\n", peter.count_cold);
     fprintf(log_file, "  ангин за жизнь:      %d\n", peter.count_angina);
     fprintf(log_file, "  переломов за жизнь:  %d\n", peter.count_broken_bone);
@@ -473,7 +495,7 @@ void log_month_report()
 
 void simulation()
 {
-    while (peter.health > 0.0){
+    do {
 
         peter_reset_month_stats();
 
@@ -483,47 +505,25 @@ void simulation()
 
         peter_dismissial_from_work();
         peter_promotion_at_work();
+        peter_find_work();
 
         peter_disease();
 
         peter_mortage();
 
-        //peter_rent(year, month);              // аренда квартиры (растёт каждый год)
-        //peter_food(year, month);              // еда (зависит от инфляции)
-        //peter_transport(year, month);         // метро/бензин
-        //peter_utilities(year, month);         // свет, вода, интернет
-        //peter_phone(year, month);             // мобильная связь
-        //peter_clothes(year, month);           // одежда (сезонно)
-
-        //peter_taxes(year, month);             // НДФЛ, налог на имущество
-        //peter_deposit(year, month);           // банковский вклад (капает %)
-        //peter_stocks(year, month);            // акции (случайные колебания)
-        //peter_credit(year, month);            // кредитка, проценты
-
-        //peter_car(year, month);               // покупка машины в рассрочку
-        //peter_car_repair(year, month);        // случайные поломки
-        //peter_mortgage(year, month);          // ипотека на 20 лет
-
-        //peter_vacation(year, month);          // отпуск раз в год
-        //peter_entertainment(year, month);     // спортзал
-        //peter_doctor(year, month);            // случайные болезни
-        //peter_health_check(year);             // ухудшение здоровья с возрастом
-
-        //peter_inheritance(year, month);       // наследство от бабушки
-        //peter_friend_loan(year, month);       // дал в долг другу
-        //peter_accident(year, month);          // ДТП
-
-        //peter_economy(year, month);           // кризис/рост
-        //peter_pandemic(year, month);          // ковид-подобное событие
-
-        //peter_save_for_goal(year, month);     // цель: квартира/машина
-        //peter_pension_fund(year, month);      // пенсионные накопления
-        //peter_emergency_fund(year, month);    // подушка безопасности
-
         log_month_report();
 
         world_tick();
-    }
+    } while (peter.health > 0.0);
+
+
+    fprintf(log_file, "\n");
+    fprintf(log_file, "===========================================\n");
+    fprintf(log_file, "                 СМЕРТЬ\n");
+    fprintf(log_file, "===========================================\n");
+    fprintf(log_file, "  причина:  %s\n", peter.last_damage_source);
+    fprintf(log_file, "  возраст:  %u лет\n", peter.age);
+
 }
 
 int main()
