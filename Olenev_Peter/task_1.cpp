@@ -202,6 +202,7 @@ void world_tick()
     if (peter.health <= 0.0) return;
 
     peter.health -= 1.0 / 12.0;
+    peter.mental -= 1;
     if (peter.health < 0.0) peter.health = 0.0;
 
     if (peter.health <= 0.0){
@@ -229,6 +230,9 @@ void peter_girlfriend()
         peter.girlfriend = false;
         peter.mental-=10;
         peter.girlfriend_possibility=true;
+    }
+    if (peter.girlfriend=true){
+        peter.mental+=1;
     }
 }
 
@@ -280,7 +284,7 @@ void peter_salary()
 
 void peter_vacation()
 {
-    void;
+    peter.mental+=5;
 }
 
 
@@ -397,6 +401,7 @@ void peter_mortage()
                 principal_part = mortage.principal_amount;
             }
             mortage.principal_amount -= principal_part;
+            peter.mental-=1;
         }
 
         if (mortage.principal_amount == 0){
