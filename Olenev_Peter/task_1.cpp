@@ -49,6 +49,13 @@ struct Person{
 
     // причина последнего урона (для смерти)
     const char* last_damage_source;
+
+    // Семья
+    bool girlfriend;
+    bool married;
+    bool girlfriend_possibility;
+    unsigned int girlfriend_time;
+    unsigned int married_time;
 };
 
 struct World{
@@ -108,6 +115,10 @@ void peter_init()
 
     peter.last_damage_source = "старость";
     peter.girlfriend = false;
+    peter.girlfriend_possibility = true;
+    peter.married = false;
+    peter.girlfriend_time = 0;
+    peter.married_time=0;
 }
 
 
@@ -202,33 +213,45 @@ void world_tick()
 
 void peter_girlfriend()
 {
-    if (peter.girlfriend == false and number_generator(1, 50)==1){
+    if (peter.girlfriend == false and number_generator(1, 50)==1 
+    and peter.girlfriend_possibility == true){
         peter.girlfriend = true;
         peter.mental+=10;
+        peter.girlfriend_possibility=false;
     }
+
     if (peter.mental<30){
         peter.girlfriend = false;
+        peter.girlfriend_possibility == false;
     }
+
     if (peter.girlfriend == true and number_generator(1, 500)==1){
         peter.girlfriend = false;
         peter.mental-=10;
+        peter.girlfriend_possibility=true;
     }
 }
 
 
 void peter_married()
 {
-    if (peter.girlfriend_time == number_generator(24, 36) and peter.salary>=80000){
+    if (peter.girlfriend_time > number_generator(24, 36) and peter.salary>=80000){
         peter.married=true;
         peter.girlfriend=false;
         peter.girlfriend_possibility=false;
     }
-}
 
+    if (peter.mental<30){
+        peter.married = false;
+    }  
+}
 
 void peter_childrens()
 {
-    void;
+    unsigned int ch=peter.childs;
+    if (peter.married_time > number_generator(12*ch, 24*ch) and peter.age<40){
+        peter.childs+=1;
+    }
 }
 
 
@@ -237,7 +260,11 @@ void peter_grandchildrens()
     void;
 }
 
-
+void peter_family(){
+    peter_girlfriend();
+    peter_married();
+    peter_childrens();
+}
 
 // ================== РАБОТА ==================
 
@@ -332,6 +359,16 @@ void peter_find_work()
     }
 }
 
+void peter_month_income()
+{
+    peter_dismissial_from_work();
+    peter_find_work();
+    peter_promotion_at_work();
+    peter_salary();
+
+    peter.month_income = peter.salary;
+    peter.cash += peter.month_income;
+}
 
 // ================== РАСХОДЫ ==================
 
@@ -368,11 +405,17 @@ void peter_mortage()
     }
 }
 
- void peter_food()
- {
-    void;
- }
 
+void peter_food()
+{
+    void;
+}
+
+
+void peter_expenses()
+{
+    peter_mortage()
+}
 // ================== БОЛЕЗНИ ==================
 
 void peter_damage(double amount, const char* source)
@@ -448,6 +491,18 @@ void peter_disease()
     peter_disease_heart_attack();
 }
 
+
+void peter_health()
+{
+    peter_disease();
+}
+
+// ================= МЕНТАЛЬНОЕ ЗДОРОВЬЕ ====================
+
+void peter_mantality()
+{
+    void;
+}
 
 // ================== ЛОГ ==================
 
@@ -580,16 +635,13 @@ void simulation()
     do {
         peter_reset_month_stats();
 
-        peter_dismissial_from_work();
-        peter_find_work();
-        peter_promotion_at_work();
-        peter_salary();
+        peter_month_income();
 
-        peter.month_income = peter.salary;
-        peter.cash += peter.month_income;
+        peter_expenses();
 
-        peter_disease();
-        peter_mortage();
+        peter_health();
+
+        peter_family();
 
         log_month_report();
 
