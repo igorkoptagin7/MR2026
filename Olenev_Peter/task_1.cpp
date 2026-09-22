@@ -363,6 +363,7 @@ void peter_find_work()
     }
 }
 
+
 void peter_month_income()
 {
     peter_dismissial_from_work();
@@ -419,7 +420,7 @@ void peter_food()
 
 void peter_expenses()
 {
-    peter_mortage()
+    peter_mortage();
 }
 // ================== БОЛЕЗНИ ==================
 
