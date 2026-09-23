@@ -3,7 +3,6 @@
 #include <time.h>
 
 using RUB = unsigned long long int;
-//using RUB = long long int;
 
 struct Pet {
     bool presence;
@@ -135,7 +134,7 @@ RUB apply_inflation(RUB base, double rate)
 
 //Повышение всего, согласно инфляции раз в год
 
-void inflation_apply_yearly()
+void bob_inflation_apply_yearly()
 {
     bob.flat_1.gas_rate = apply_inflation(bob.flat_1.gas_rate, bob.inflation.utilities);
     bob.flat_1.cold_water_rate = apply_inflation(bob.flat_1.cold_water_rate, bob.inflation.utilities);
@@ -211,7 +210,7 @@ void bob_utilities()
 
 ////////////////////////////
 
-const SalaryEvent salary_schedule[] = {
+const SalaryEvent bob_salary_schedule[] = {
     {2027, 1, 100'000},     // переход со стажировки
     {2029, 5, 140'000},     // смена работы
     {2030, 1, 180'000},     // повышение
@@ -219,13 +218,13 @@ const SalaryEvent salary_schedule[] = {
     {2032, 11, 200'000},    // повышение
 };
 
-const int salary_schedule_size = sizeof(salary_schedule) / sizeof(salary_schedule[0]);
+const int bob_salary_schedule_size = sizeof(bob_salary_schedule) / sizeof(bob_salary_schedule[0]);
 
 void bob_salary(const int year, const int month) 
 {
-        for (int i = 0; i < salary_schedule_size; ++i) {
-        if (year == salary_schedule[i].year && month == salary_schedule[i].month) {
-            bob.salary = salary_schedule[i].salary;
+        for (int i = 0; i < bob_salary_schedule_size; ++i) {
+        if (year == bob_salary_schedule[i].year && month == bob_salary_schedule[i].month) {
+            bob.salary = bob_salary_schedule[i].salary;
         }
     }
 
@@ -341,7 +340,7 @@ void bob_car_repair(const int year, const int month)
 }
 
 //налог на транспорт   !! сделать оплату в марте
-RUB transport_tax_yearly() 
+RUB bob_transport_tax_yearly() 
 {
     if (!bob.car_1.presence) {
         return 0;
@@ -378,7 +377,7 @@ RUB transport_tax_yearly()
 }
 
 //налог на имущество !!сделать оплату в декабре
-RUB property_tax_yearly()
+RUB bob_property_tax_yearly()
 {
     if (!bob.flat_1.presence) {
         return 0;
@@ -512,47 +511,6 @@ void bob_home_bills(const int year, const int month)
     try_pay(bob.account.currency, bills);
 }
 
-void bob_mortgage_issue(const int year, const int month)
-{
-    if (bob.flat_1.presence) return;
-
-    if (year > 2033 || (year == 2033 && month >= 3)) {
-        credit_init(bob.mortgage, "ипотека", 8'000'000, 0.08, 300);
-        //bob.mortgage.monthly_payment = 70'000;
-        bob.flat_1.presence = true;
-    }
-}
-
-void bob_mortgage_payment(const int year, const int month)
-{
-    if (bob.mortgage.remaining == 0) {
-        return;
-    }
-    
-    credit_accrue_monthly(bob.mortgage);
-    credit_process_payment(bob.mortgage);
-    
-    /*if (year >= 2052) return;
-
-    RUB payment = 70'000;
-    if (month == 1) {
-        payment *= 2;
-    }
-    if (bob.mortgage.remaining < payment) {
-        payment = bob.mortgage.remaining;
-    }
-
-    if (try_pay(bob.account.currency, payment)) {
-        bob.mortgage.remaining -= payment;
-    }*/
-}
-
-void bob_mortgage(const int year, const int month)
-{
-    bob_mortgage_issue(year, month);
-    bob_mortgage_payment(year, month);
-}
-
 void bob_dog_buy(const int year, const int month)
 {
     if (bob.dog.presence || bob.dog.had_dog) {
@@ -628,7 +586,7 @@ void bob_NDFL(const int month) {
 //кредитная система
 
 //проверка возможности взять кредит
-int find_free_credit_slot()
+int bob_find_free_credit_slot()
 {
     for (int i = 0; i < 5; ++i) {
         if (!bob.credits[i].active) {
@@ -639,9 +597,10 @@ int find_free_credit_slot()
 }
 
 //создание кредита
-
 void credit_init(Credit& c, const char* name, RUB principal, double rate, int term_months)
 {
+    if (bob_find_free_credit_slot() == -1) return;
+
     c.active = true;
     c.closed = false;
     c.name = name;
@@ -731,6 +690,8 @@ void credit_process_payment(Credit& c)
 //прогон всех кредитов
 void bob_credit_payments()
 {
+    if (bob_find_free_credit_slot() == -1) return;
+
     for (int i = 0; i < 5; ++i) {
         if (!bob.credits[i].active) {
             continue;
@@ -762,6 +723,47 @@ void bob_credit_score_update()
     if (bob.account.credit_score < 0)   bob.account.credit_score = 0;
 }
 
+//ипотека
+void bob_mortgage_issue(const int year, const int month)
+{
+    if (bob.flat_1.presence) return;
+
+    if (year > 2033 || (year == 2033 && month >= 3)) {
+        credit_init(bob.mortgage, "ипотека", 8'000'000, 0.08, 300);
+        //bob.mortgage.monthly_payment = 70'000;
+        bob.flat_1.presence = true;
+    }
+}
+
+void bob_mortgage_payment(const int year, const int month)
+{
+    if (bob.mortgage.remaining == 0) {
+        return;
+    }
+    
+    credit_accrue_monthly(bob.mortgage);
+    credit_process_payment(bob.mortgage);
+    
+    /*if (year >= 2052) return;
+
+    RUB payment = 70'000;
+    if (month == 1) {
+        payment *= 2;
+    }
+    if (bob.mortgage.remaining < payment) {
+        payment = bob.mortgage.remaining;
+    }
+
+    if (try_pay(bob.account.currency, payment)) {
+        bob.mortgage.remaining -= payment;
+    }*/
+}
+
+void bob_mortgage(const int year, const int month)
+{
+    bob_mortgage_issue(year, month);
+    bob_mortgage_payment(year, month);
+}
 
 //Кредитка? Автокредит? Потребкредит?
 
@@ -776,7 +778,7 @@ void simulation()
     RUB education_paid_year = 0;
     RUB medicine_paid_year = 0;
 
-    while ( !(year == 2027 && month == 9) ) { 
+    while ( !(year == 2040 && month == 9) ) { 
 
         bob_salary(year, month);
         //bob_side_job_start(year, month);
@@ -815,9 +817,9 @@ void simulation()
 
 
         //годовые налоги и инфляция
-        if (month == 3)  try_pay(bob.account.currency, transport_tax_yearly());
-        if (month == 12) try_pay(bob.account.currency, property_tax_yearly());
-        if (month == 1)  inflation_apply_yearly();
+        if (month == 3)  try_pay(bob.account.currency, bob_transport_tax_yearly());
+        if (month == 12) try_pay(bob.account.currency, bob_property_tax_yearly());
+        if (month == 1)  bob_inflation_apply_yearly();
 
         //возврат налогов
         bob_tax_refund(month, mortgage_paid_year, education_paid_year, medicine_paid_year);
