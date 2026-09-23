@@ -417,9 +417,9 @@ void alice_try_mortgage(const int year, const int month) {
 
     std::cout << year << " год (возраст " << age
         << "): Элис решила взять ипотеку!\n";
-    std::cout << "    Сумма: " << mortgage_amount << " руб., ставка: "
+    std::cout << " Сумма: " << mortgage_amount << " руб., ставка: "
         << mortgage_rate << "%, срок: " << mortgage_term_years << " лет\n";
-    std::cout << "    Ежемесячный платеж: " << estimated_payment << " руб.\n";
+    std::cout << " Ежемесячный платеж: " << estimated_payment << " руб.\n";
 }
 
 void alice_pay_mortgage(const int year, const int month) {
@@ -509,18 +509,18 @@ void alice_init() {
 }
 
 void alice_printf() {
-    std::cout << "Текущий статус:   " << alice.current_activity << "\n";
-    std::cout << "Зарплата:         " << alice.salary << " руб./мес.\n";
-    std::cout << "Накопления:       " << alice.cash << " руб.\n";
+    std::cout << "Текущий статус: " << alice.current_activity << "\n";
+    std::cout << "Зарплата: " << alice.salary << " руб./мес.\n";
+    std::cout << "Накопления: " << alice.cash << " руб.\n";
 
         if (alice.car.has_car) {
-            std::cout << "Машина:           " << alice.car.model << "\n";
-            std::cout << "  Состояние:      " << alice.car.health << "%\n";
-            std::cout << "  Возраст:        " << alice.car.age_months / 12
+            std::cout << "Машина: " << alice.car.model << "\n";
+            std::cout << "  Состояние:  " << alice.car.health << "%\n";
+            std::cout << "  Возраст:  " << alice.car.age_months / 12
                 << " лет " << alice.car.age_months % 12 << " мес.\n";
         }
         else {
-            std::cout << "Машина:           Отсутствует\n";
+            std::cout << "Машина: Отсутствует\n";
         }
 }
 
