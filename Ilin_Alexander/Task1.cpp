@@ -3,207 +3,215 @@
 #include <random>
 #include <string>
 
-using LIFE = unsigned int;
-
 using RUB = unsigned long int;
 
-const int end_month = 7;
-const int end_year = 2036;
+namespace Config {
+    // Дата
+    constexpr int END_MONTH = 7;
+    constexpr int END_YEAR  = 2036;
+    // Банк
+    constexpr double BASE_BANK_PERCENT   = 0.10;
+    constexpr double SPEND_BONUS_PERCENT = 0.07;
+    constexpr RUB    SPEND_BONUS_THRESHOLD = 5'000;
+    // Интерес (границы)
+    constexpr double INTEREST_HIGH   = 0.10;
+    constexpr double INTEREST_MEDIUM = 0.30;
+    constexpr double INTEREST_LOW    = 0.50;
+    // Интерес (шансы)
+    constexpr int CHANCE_MEDIUM = 50; // %
+    constexpr int CHANCE_LOW    = 10; // %
+}
 
-int month = 1;
-int year = 2026;
+class random_int {
+    std::mt19937 gen_;
+public:
+    random_int() : gen_(std::random_device{}()) {}                              // Случайное число
 
-static std::random_device seed;
-static std::mt19937 generator(seed());
+    RUB integer(RUB low, RUB upp) {
+        return std::uniform_int_distribution<RUB>(low, upp)(gen_);              // Случайное число в пределах
+    }
 
-class Person 
-{
+    bool chance(int percent) {
+        return std::uniform_int_distribution<int>(1, 100)(gen_) <= percent;     // случайное число в процентах шанса
+    }
+};
+
+class Person {
 public:
 
-    bool life = true;
-// Животное
-    bool animal = false;                // Подумать о создании нового класса...
-    RUB animal_cost = 10'000;
-// Деньги
-    RUB money = 10'000;
+    // Состояние
+    bool alive  = true;
+
+    // Деньги
+    RUB money         = 10'000;
     RUB safety_pillow = 50'000;
-// Банкиры
-    RUB bank_money = 0;
-    float bank_percent = 0.3;
-    RUB total_spent = 0;
-// Доходы
+    RUB bank_money    = 0;
+    RUB month_spent   = 0;
+
+    // Доходы
     RUB salary = 10'000;
-// Траты
-    RUB spents_food = 8'000;
+
+    // Обязательные траты
+    RUB spents_food     = 8'000;
     RUB spents_internet = 1'500;
+    bool spents_internet_b = true;
+    bool internet = true; 
 
-    RUB random_digital(const RUB x, const RUB y)
+    // Животное
+    RUB animal_cost = 10'000;
+    bool animal = false;
+
+    Person() = default;
+    explicit Person(RUB safety_pillow_new) : safety_pillow(safety_pillow_new) 
     {
-        std::uniform_int_distribution<RUB> cost(x, y);
-        return cost(generator);
+
     }
 
-    void money_profit(const RUB profit)                                 // Изменение бюджета в плюс
-    {
-        money += profit;
-    }
-    void money_less(const RUB profit)                                   // Изменение бюджета в минус
-    {
-        money -= profit;
+    void earn(const RUB amount)                             // Заработок
+    { 
+        money += amount;   
     }
 
-    void money_count()                                                  // Выписка бюджета
-    {
-        if (life){
-            printf("My money                   : %lu\n", money);
-            printf("My money in bank           : %lu\n", bank_money);
-            if (animal){
-                printf("You have a animal\n");
-            }
-        }
-        else{
-            printf("U are bankrupt :( ");
-        }
+    void spend(const RUB amount)                            // Трата
+    { 
+        money -= amount; 
     }
 
-    bool check_money(const RUB cost)                                    // Проверка на хватку денег (Выдает тру/фолс)
+    bool can_buy(const RUB cost)                            // Проверка на хватку денег
     {
-        bool verified = false;
-        if (cost < money){
-            if (cost <= (money + bank_money)){
-                verified = true;
-            }
-            if (cost > (money + bank_money)){
-                life = false;
-            }
-        }
-        return verified;
+        return (cost <= money + bank_money);
     }
 
-    bool check_interest(const RUB cost)                                 // Проверка на заинтересованность в покупке (Выдает тру/фолс)
-    {   
-        bool verified = false;                                          // verified - проверено              
-        if(bank_money > 0){
-            float interest = static_cast<float>(cost) / static_cast<float>(bank_money);                           
-            if ((0 < interest) && (interest <= 0.1)){       // Высокий интерес
-                verified = true;
-            }
-            if ((0.1 < interest) && (interest <= 0.3)){     // Средний интерес
-                if (random_digital(0, 100) < 50){
-                    verified = true;              
-                }
-                else{
-                    verified = false;
-                }
-            }
-            if ((0.3 < interest) && (interest <= 0.5)){     // Низкий интерес
-                if (random_digital(0, 100) < 10){
-                    verified = true;              
-                }
-                else{
-                    verified = false;
-                }
-            }
-            if (interest > 0.5){            // Отсутствие интереса
-                verified = false;
-            }
-        }    
-        return verified;
+    void receive_salary() {                                 // Зарплата
+        earn(salary);
     }
 
-    void get_salary()                                                      // Зарплата
-    {
-        if (salary){
-        money_profit(salary); 
-        }
-    }
+    void do_shopping(random_int& r_int) {                   //Покупка
+        RUB spent = 0;
 
-    void buy_animal()
-    {
-        animal = true;
-        money_less(animal_cost);    
-    }
+        // Обязательные траты
 
-    void shopping()                                                     // Траты на еду
-    {
-        RUB cost = 0;
-        if (spents_food){
-            cost += spents_food;
-        }
-        if (spents_internet){
+        RUB cost = spents_food;
+        if (spents_internet_b) {
             cost += spents_internet;
+            internet = true;
         }
-        if(check_money(cost)){
-            money_less(cost); 
+        else {
+            internet = false;
         }
 
-        if (!animal and check_money(animal_cost) && check_interest(animal_cost)){
-            buy_animal();
-            cost += animal_cost;
+        if (can_buy(cost)) {
+            spend(cost);
+            spent += cost;
+        } else {
+            alive = false;
+            return;
         }
-        total_spent = cost;
+
+        // Необязательные траты
+
+        if (!animal && can_buy(animal_cost) && interested_in(animal_cost, r_int)) {
+            spend(animal_cost);
+            animal = true;
+            spent += animal_cost;
+        }
+
+        month_spent = spent;
     }
 
-    void cost_save()                                                    // Сбережения
-    {
-        if (money > safety_pillow){
+    void save_to_bank() {                                               // Накопление в банк
+        if (money > safety_pillow) {
             RUB transfer = money - safety_pillow;
+            money      -= transfer;
             bank_money += transfer;
-            money -= transfer;
         }
-    } 
-    
-    void bank_percent_profit()
-    {
-        bank_percent = 0.1;
-        
-        if (total_spent >= 5'000){
-            bank_percent += 0.07;
-        }
-        money += static_cast<RUB>(static_cast<float>(bank_money) * (bank_percent / 12));
     }
 
+    void bank_percents() {                                              // Начисление процентов за месяц
+        double percent = Config::BASE_BANK_PERCENT;
+        if (month_spent >= Config::SPEND_BONUS_THRESHOLD) {
+            percent += Config::SPEND_BONUS_PERCENT;
+        }
+        bank_money += static_cast<RUB>(bank_money * percent / 12);
+    }
+
+    void print_report() const {                                         // Сводка результатов
+        if (!alive) {
+            printf("You are bankrupt :(\n");
+            return;
+        }
+        printf("My money         : %llu\n", money);
+        printf("My money in bank : %llu\n", bank_money);
+        printf("Total            : %llu\n", money + bank_money);
+        if (animal) {
+            printf("You have an animal\n");
+        }
+    }
+
+private:
+
+    bool interested_in(const RUB cost, random_int& r_int){                                     // Интерес в покупке
+        if (bank_money == 0) {
+            return false;
+        }
+
+        double interest = static_cast<double>(cost) / static_cast<double>(bank_money);
+
+        if (interest <= Config::INTEREST_HIGH) {
+            return true;
+        }
+        if (interest <= Config::INTEREST_MEDIUM) {
+            if (r_int.integer(0, 100) < Config::CHANCE_MEDIUM) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        if (interest <= Config::INTEREST_LOW){
+            if (r_int.integer(0, 100) < Config::CHANCE_LOW) {
+                return true;
+            }
+            else {
+                return false;
+            }  
+        }
+        else {
+            return false;
+        }    
+    }
 };
-/*
-class Animal
-{
-    public:
-    LIFE hunger = 5;
 
-    void eating()
-    {
-        if (){
-            hunger -= 1
+void simulation(Person& person) {
+    random_int r_int;
+
+    for (int year = 2026; year <= Config::END_YEAR; ++year) {
+        for (int month = 1; month <= 12; ++month) {
+            if (year == Config::END_YEAR && month == Config::END_MONTH) {
+                person.print_report();
+                return;
+            }
+
+            if (!person.alive) {
+                person.print_report();
+                return;
+            }
+
+            person.receive_salary();
+            person.do_shopping(r_int);
+            person.save_to_bank();
+            person.bank_percents();
         }
-        if (hunger)
-    }
-}
-*/
-
-Person I{};
-
-void simulation(Person& person)
-{
-    for(; year <= end_year; year++){                                    // Ежегодно
-
-        for (; month <= 12 ; month++){                                  // Ежемесячно
-                if(year == end_year && month == end_month){
-                    person.money_count();
-                    return;
-                }
-                
-                person.get_salary(); 
-
-                person.shopping();
-
-                person.cost_save();
-                person.bank_percent_profit();
-        }
-        month = 1;
     }
 }
 
-int main()
-{
-    simulation(I);
+int main() {
+    Person Alice;
+    Person Bob{20'000};
+
+    printf("Alice\n");
+    simulation(Alice);
+
+    printf("\nBob\n");
+    simulation(Bob);
 }
