@@ -396,12 +396,10 @@ void alice_try_mortgage(const int year, const int month) {
 
     double monthly_rate = mortgage_rate / 100.0 / 12.0;
     int term_months = mortgage_term_years * 12;
-    RUB estimated_payment = static_cast<RUB>(
-        mortgage_amount *
-        (monthly_rate * pow(1 + monthly_rate, term_months)) /
-        (pow(1 + monthly_rate, term_months) - 1)
-        );
 
+    RUB estimated_payment = Bank::calculate_annuity_payment(
+        mortgage_amount, mortgage_rate, term_months
+    );
 
     if (alice.salary < estimated_payment * 2) {
         return;
@@ -422,8 +420,6 @@ void alice_try_mortgage(const int year, const int month) {
     std::cout << "    Сумма: " << mortgage_amount << " руб., ставка: "
         << mortgage_rate << "%, срок: " << mortgage_term_years << " лет\n";
     std::cout << "    Ежемесячный платеж: " << estimated_payment << " руб.\n";
-    std::cout << "    Зарплата: " << alice.salary << " руб. (в "
-        << (alice.salary / estimated_payment) << " раз выше платежа)\n";
 }
 
 void alice_pay_mortgage(const int year, const int month) {
