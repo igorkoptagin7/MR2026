@@ -30,14 +30,14 @@ struct Inflation {
 
 struct Credit {
     bool active;
-    bool clised;
+    bool closed;
     const char* name;
     RUB principal;  // Нач сум
     RUB remaining;  // Текущий остаток
     double rate;    // Годовая ставка
     RUB monthly_payment;    // платёж по графику
     int term_months;        // срок в месяцах
-    int months_paids;        // выплачено
+    int months_paid;        // выплачено
     int overdue_months;     //месяцы просрочки
     RUB penalty;            // пеня
     RUB total_overdue;      // общая сумма просрочки
@@ -99,7 +99,7 @@ struct Person {
     Inflation inflation;
     Job job_side;
     Credit credits[5];
-    int credit_count;
+    int credits_count;
     RUB medicine_monthly;
     RUB clothing_monthly;
     RUB education_monthly;
@@ -199,8 +199,6 @@ RUB utility_total()
     total += utility_maintenance();
     return total;
 }
-
-
 
 void bob_utilities()
 {
@@ -306,7 +304,7 @@ void bob_car_use(const int year, const int month)
     }
 
     //вероятность поломки квадрат износа
-    double wear = 1.0 - (double)bob.car_1.hp / bob.car_1.max_hp;
+    double wear = 1.0 - (double)bob.car_1.hp / bob.car_1.max_hp; // отношение текущего хп к максимального
     double break_chance = wear * wear;
 
     double roll = (double)rand() / RAND_MAX;
@@ -342,10 +340,11 @@ void bob_car_repair(const int year, const int month)
     bob.car_1.broken = false;
 }
 
-void bob_car_bill(const int year, const int month) 
+//налог на транспорт   !! сделать оплату в марте
+RUB transport_tax_yearly() 
 {
     if (!bob.car_1.presence) {
-        return;
+        return 0;
     }
 
     int power = bob.car_1.power;
@@ -375,11 +374,97 @@ void bob_car_bill(const int year, const int month)
     else {
         rate = 150;
     }
-    RUB tax = (RUB)power * rate;
-    RUB monthly_tax = tax / 12;
-
-    bob.account.currency -= monthly_tax;
+    return (RUB)(power * rate);
 }
+
+//налог на имущество !!сделать оплату в декабре
+RUB property_tax_yearly()
+{
+    if (!bob.flat_1.presence) {
+        return 0;
+    }
+    return bob.flat_1.property_tax_yearly;
+}
+
+//возврат налога по ипотеке 13%, но не больше 260'000
+RUB tax_refund_mortgage(RUB paid_this_year)
+{
+    RUB refund = (RUB)(paid_this_year * 0.13);
+    if (refund > 260'000) {
+        refund = 260'000;
+    }
+    return refund;
+}
+
+//возврат налога за образование, проценты те же но не больше 15'600 в год
+RUB tax_refund_education(RUB paid_this_year)
+{
+    RUB refund = (RUB)(paid_this_year * 0.13);
+    if (refund > 15'600) {
+        refund = 15'600;
+    }
+    return refund;
+}
+
+//возврат налога на медицину, то же, что в образовании
+RUB tax_refund_medicine(RUB paid_this_year)
+{
+    RUB refund = (RUB)(paid_this_year * 0.13);
+    if (refund > 15'600) {
+        refund = 15'600;
+    }
+    return refund;
+}
+
+//возвраты, например в четвёртый месяц раз в год
+void bob_tax_refund(const int month, RUB mortgage_paid_year, RUB education_paid_year, RUB medicine_paid_year)
+{
+    if (month != 4) {
+        return;
+    }
+    RUB total = 0;
+    total += tax_refund_mortgage(mortgage_paid_year);
+    total += tax_refund_education(education_paid_year);
+    total += tax_refund_medicine(medicine_paid_year);
+
+    bob.account.tax_refund_accum += total;
+    bob.account.currency += total;
+    bob.account.year_income += total;
+}
+
+// система вклада
+// пополнение из сфободных денег
+void bob_deposit_add()
+{
+    if (bob.account.currency > 200'000) {
+        RUB put = (bob.account.currency - 200'000) / 10;
+        bob.account.currency -= put;
+        bob.account.deposit += put;
+    }
+}
+
+//проценты раз в месяц
+void bob_deposit_interest()
+{
+    RUB interest = (RUB)(bob.account.deposit * 0.005);
+    bob.account.deposit += interest;
+    bob.account.year_income += interest;
+}
+
+//съём с вклада, если мало денег
+void bob_deposit_withdraw()
+{
+    if (bob.account.currency < 50'000 && bob.account.deposit > 0) {
+        RUB need = 50'000 - bob.account.currency;
+        if (need > bob.account.deposit) {
+            need = bob.account.deposit;
+        }
+        bob.account.deposit -= need;
+        bob.account.currency += need;
+    }
+}
+
+//вторая работа (надо ли реализовывать?)
 
 void bob_food(const int year) 
 {
@@ -392,7 +477,7 @@ void bob_rent(const int year, const int month)
         return;
     }
 
-    long int rent = 0;
+    RUB rent = 0;
 
     if ((year < 2027 || (year == 2027 && month <= 8))) {
         rent = 0;
@@ -432,16 +517,22 @@ void bob_mortgage_issue(const int year, const int month)
     if (bob.flat_1.presence) return;
 
     if (year > 2033 || (year == 2033 && month >= 3)) {
+        credit_init(bob.mortgage, "ипотека", 8'000'000, 0.08, 300);
+        //bob.mortgage.monthly_payment = 70'000;
         bob.flat_1.presence = true;
-        bob.mortgage.remaining = 15'000'000;
     }
 }
 
 void bob_mortgage_payment(const int year, const int month)
 {
-    if (bob.mortgage.remaining == 0) return;
-
-    if (year >= 2052) return;
+    if (bob.mortgage.remaining == 0) {
+        return;
+    }
+    
+    credit_accrue_monthly(bob.mortgage);
+    credit_process_payment(bob.mortgage);
+    
+    /*if (year >= 2052) return;
 
     RUB payment = 70'000;
     if (month == 1) {
@@ -453,7 +544,7 @@ void bob_mortgage_payment(const int year, const int month)
 
     if (try_pay(bob.account.currency, payment)) {
         bob.mortgage.remaining -= payment;
-    }
+    }*/
 }
 
 void bob_mortgage(const int year, const int month)
@@ -501,28 +592,6 @@ void bob_dog(const int year, const int month)
     bob_dog_upkeep(year, month);
 }
 
-void bob_food_bank_income(const int year, const int month)
-{
-    if (bob.account.currency > 200'000) {
-        RUB put = (bob.account.currency - 200'000) / 10;
-        bob.account.currency -= put;
-        bob.account.deposit += put;
-    }
-    bob.account.deposit += (RUB)(bob.account.deposit * 0.005);
-    bob.account.year_income += (RUB)(bob.account.deposit * 0.005);
-
-    if (bob.account.currency <= 50'000 && bob.account.deposit > 0) {
-        RUB need = (50'000 - bob.account.currency);
-        if (need > bob.account.deposit) {
-            need = bob.account.deposit;
-        }
-        bob.account.deposit -= need;
-        bob.account.currency += need;
-        //bob.account.year_income += need;
-
-    }
-}
-
 RUB sum_tax(RUB income)
 {
     if (income <= 2'400'000) {
@@ -556,6 +625,146 @@ void bob_NDFL(const int month) {
 
 }
 
+//кредитная система
+
+//проверка возможности взять кредит
+int find_free_credit_slot()
+{
+    for (int i = 0; i < 5; ++i) {
+        if (!bob.credits[i].active) {
+            return i;
+        }
+    }
+    return -1; ///-1?
+}
+
+//создание кредита
+
+void credit_init(Credit& c, const char* name, RUB principal, double rate, int term_months)
+{
+    c.active = true;
+    c.closed = false;
+    c.name = name;
+    c.principal = principal;
+    c.remaining = principal;
+    c.rate = rate;
+    c.term_months = term_months;
+    c.months_paid = 0;
+    c.overdue_months = 0;
+    c.penalty = 0;
+    c.total_overdue = 0;
+
+    //платёж. слизан с аннуитетного, но проще. прям сильно
+    double monthly_rate = rate / 12.0;
+    double factor = 1.0;
+    for (int i = 0; i < term_months; ++i) {
+        factor *= (1.0 + monthly_rate);
+    }
+    double payment = (double)principal * monthly_rate * factor / (factor - 1.0);
+    c.monthly_payment = (RUB)payment;
+}
+
+//начисление процентов
+void credit_accrue_monthly(Credit& c)
+{
+    if (!c.active || c.closed) {
+        return;
+    }
+    double monthly_rate = c.rate / 12.0;
+    RUB interest = (RUB)((double)c.remaining * monthly_rate);
+    c.remaining +=interest;
+}
+
+//система пени (штрафа)
+void credit_penalty(Credit& c)
+{
+    if (!c.active || c.closed) {
+        return;
+    }
+    RUB peny = (RUB)((double)c.monthly_payment * 0.03);
+    c.penalty += peny;
+    c.remaining += peny;
+}
+
+//Платёж если есть деньги, иначе минус рейтинг
+void credit_process_payment(Credit& c)
+{
+    if (!c.active || c.closed) {
+        return;
+    }
+    RUB need = c.monthly_payment + c.penalty;
+    if (try_pay(bob.account.currency, need)) {
+        c.remaining -= c.monthly_payment;
+        c.penalty = 0;
+        c.months_paid++;
+        c.overdue_months = 0;
+    
+
+        if (c.remaining <= c.monthly_payment) {
+            c.remaining = 0;
+            c.closed = true;
+            c.active = false;
+            if (bob.account.credit_score < 100) {
+                    bob.account.credit_score += 5;
+            }
+        }
+
+        if (bob.account.credit_score < 100) {
+            bob.account.credit_score += 1;
+        }
+    }
+    else {
+        c.overdue_months++;
+        c.total_overdue += c.monthly_payment;
+        credit_penalty(c);
+        
+        //просрочка --> - рейтинг
+        if (bob.account.credit_score > 0) {
+            bob.account.credit_score -= 3;
+            if (bob.account.credit_score < 0) {
+                bob.account.credit_score = 0;
+            }
+        }
+    }  
+}
+
+//прогон всех кредитов
+void bob_credit_payments()
+{
+    for (int i = 0; i < 5; ++i) {
+        if (!bob.credits[i].active) {
+            continue;
+        }
+        credit_accrue_monthly(bob.credits[i]);
+        credit_process_payment(bob.credits[i]);
+    }
+}
+
+//обновление рейтинга
+void bob_credit_score_update()
+{
+    int active_credits = 0;
+    int total_overdue = 0;
+
+    for (int i = 0; i < 5; ++i) {
+        if (bob.credits[i].active) {
+            active_credits++;
+            total_overdue += bob.credits[i].overdue_months;
+        }
+    }
+    if (active_credits >= 3) {
+        if (bob.account.credit_score > 0) bob.account.credit_score -= 1;
+    }
+        if (total_overdue > 6) {
+        if (bob.account.credit_score > 0) bob.account.credit_score -= 2;
+    }
+    if (bob.account.credit_score > 100) bob.account.credit_score = 100;
+    if (bob.account.credit_score < 0)   bob.account.credit_score = 0;
+}
+
+
+//Кредитка? Автокредит? Потребкредит?
+
 void simulation() 
 {
     srand((unsigned)time(0));
@@ -579,7 +788,7 @@ void simulation()
 
         bob_rent(year, month);
         bob_home_bills(year, month);
-        //bob_utilities();
+        bob_utilities();
 
         bob_food(year);
         /*bob_medicine();
@@ -591,29 +800,27 @@ void simulation()
         bob_dog(year, month);
         //bob_dog_vet(month);
 
-        bob_food_bank_income(year, month);
-
         bob_NDFL(month);
 
         bob_car(year, month);
         bob_car_use(year, month);
         bob_car_repair(year, month);
-        bob_car_bill(year, month);
+        //bob_car_bill(year, month);      // функция переехала под другое имя
 
         /*bob_take_consumer_credit(year, month);
         bob_take_car_credit(year, month);
-        bob_take_credit_card();
+        bob_take_credit_card();*/
         bob_credit_payments();
-        bob_credit_score_update();*/
+        bob_credit_score_update();
 
 
         //годовые налоги и инфляция
-        /*if (month == 3)  try_pay(bob.account.currency, transport_tax_yearly());
+        if (month == 3)  try_pay(bob.account.currency, transport_tax_yearly());
         if (month == 12) try_pay(bob.account.currency, property_tax_yearly());
-        if (month == 1)  inflation_apply_yearly();*/
+        if (month == 1)  inflation_apply_yearly();
 
         //возврат налогов
-        //bob_tax_refund(month, mortgage_paid_year, education_paid_year, medicine_paid_year);
+        bob_tax_refund(month, mortgage_paid_year, education_paid_year, medicine_paid_year);
         
         /*if (month == 12) {
         print_year_report(year);
@@ -630,6 +837,19 @@ void simulation()
 
     }
 
+}
+
+void inflation_init()
+{
+    bob.inflation.food = 0.08;
+    bob.inflation.utilities = 0.07;
+    bob.inflation.rent = 0.06;
+    bob.inflation.car = 0.05;
+    bob.inflation.pet = 0.07;
+    bob.inflation.medicine = 0.09;
+    bob.inflation.clothing = 0.05;
+    bob.inflation.education = 0.06;
+    bob.inflation.services = 0.08;
 }
 
 void bob_init() 
@@ -674,7 +894,7 @@ void bob_init()
     bob.job_side.company = "";
     bob.job_side.salary = 0;
 
-    /*bob.mortgage.active = false;
+    bob.mortgage.active = false;
     bob.mortgage.closed = false;
     bob.mortgage.name = "ипотека";
     bob.mortgage.principal = 0;
@@ -705,20 +925,8 @@ void bob_init()
 
     bob.medicine_monthly = 3'000;
     bob.clothing_monthly = 5'000;
-    bob.education_monthly = 0;*/
-}
-
-void inflation_init()
-{
-    bob.inflation.food = 0.08;
-    bob.inflation.utilities = 0.07;
-    bob.inflation.rent = 0.06;
-    bob.inflation.car = 0.05;
-    bob.inflation.pet = 0.07;
-    bob.inflation.medicine = 0.09;
-    bob.inflation.clothing = 0.05;
-    bob.inflation.education = 0.06;
-    bob.inflation.services = 0.08;
+    bob.education_monthly = 0;
+    inflation_init();
 } 
 
 void bob_print() 
