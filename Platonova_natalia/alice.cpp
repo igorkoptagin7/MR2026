@@ -30,20 +30,61 @@ struct Car {
     int health = 100;              
     int age_months = 0;            
 
-    // Финансовые параметры
-    RUB purchase_price = 0;
-    RUB monthly_cost = 0;          // Страховка + бензин + налоги
 
-    // Стоимость разных типов ремонта
+    RUB purchase_price = 0;
+    RUB monthly_cost = 0;         
+
     RUB light_repair_cost = 15000;     
     RUB heavy_repair_cost = 50000;     
     RUB capital_repair_cost = 150000;  
 };
 
+struct Mortgage {
+    bool is_active = false;
+    RUB total_amount = 0;          //общая сумма ипотеки
+    RUB remaining_balance = 0;     //остаток долга
+    double annual_rate = 0.0;      //годовая ставка
+    int term_months = 0;           //срок в месяцах
+    RUB monthly_payment = 0;       //ежемесячный платеж
+    int months_paid = 0;           //сколько месяцев уже выплачено
+};
+
+struct Loan {
+    bool is_active = false;
+    RUB total_amount = 0;          //общая сумма кредита
+    RUB remaining_balance = 0;     //остаток долга
+    double annual_rate = 0.0;      //годовая ставка
+    int term_months = 0;           //срок в месяцах
+    RUB monthly_payment = 0;       //ежемесячный платеж
+    int months_paid = 0;           //сколько месяцев уже выплачено
+};
+
+struct Bank {
+    double tax_rate = 0.13;
+    RUB tax_paid_total = 0;
+    RUB scholarship = 0;
+
+    Mortgage mortgage;
+    Loan loan;
+
+    static RUB calculate_annuity_payment(RUB amount, double annual_rate, int term_months) {
+        double monthly_rate = annual_rate / 100.0 / 12.0;
+        if (monthly_rate > 0) {
+            return static_cast<RUB>(
+                amount *
+                (monthly_rate * pow(1 + monthly_rate, term_months)) /
+                (pow(1 + monthly_rate, term_months) - 1)
+                );
+        }
+        return amount / term_months;
+    }
+};
 
 struct Person {
     RUB cash = 0;
     RUB salary = 0;
+
+    int birth_year = 2019;
 
     bool is_well_off_family = false;
     LifeStatus status = LifeStatus::SCHOOL;
@@ -52,80 +93,21 @@ struct Person {
 
     int work_experience_months = 0;
 
-    Car car; 
+    Car car;
     Bank bank;
 
     double oge_average = 0.0;
     int ege_total = 0;
-};
 
-
-struct Mortgage {
-    bool is_active = false;
-    RUB total_amount = 0;          // Общая сумма ипотеки
-    RUB remaining_balance = 0;     // Остаток долга
-    double annual_rate = 0.0;      // Годовая ставка
-    int term_months = 0;           // Срок в месяцах
-    RUB monthly_payment = 0;       // Ежемесячный платеж
-    int months_paid = 0;           // Сколько месяцев уже выплачено
-};
-
-struct Loan {
-    bool is_active = false;
-    RUB total_amount = 0;          // Общая сумма кредита
-    RUB remaining_balance = 0;     // Остаток долга
-    double annual_rate = 0.0;      // Годовая ставка
-    int term_months = 0;           // Срок в месяцах
-    RUB monthly_payment = 0;       // Ежемесячный платеж
-    int months_paid = 0;           // Сколько месяцев уже выплачено
-};
-
-struct Bank {
-    // Налог
-    double tax_rate = 0.13;        // НДФЛ 13%
-    RUB tax_paid_total = 0;        // Всего уплачено налогов
-
-    // Стипендия
-    RUB scholarship = 0;           // Размер стипендии (0 если не учится)
-
-    // Ипотека
-    Mortgage mortgage;
-
-    // Кредит
-    Loan loan;
-
-    // Методы для расчётов
-    void calculate_mortgage_payment() {
-        if (!mortgage.is_active) return;
-
-        // Формула аннуитетного платежа
-        double monthly_rate = mortgage.annual_rate / 100.0 / 12.0;
-        if (monthly_rate > 0) {
-            mortgage.monthly_payment = static_cast<RUB>(
-                mortgage.remaining_balance *
-                (monthly_rate * pow(1 + monthly_rate, mortgage.term_months)) /
-                (pow(1 + monthly_rate, mortgage.term_months) - 1)
-                );
-        }
-        else {
-            mortgage.monthly_payment = mortgage.remaining_balance / mortgage.term_months;
-        }
+    int get_age(int current_year) const {
+        return current_year - birth_year;
     }
 
-    void calculate_loan_payment() {
-        if (!loan.is_active) return;
-
-        double monthly_rate = loan.annual_rate / 100.0 / 12.0;
-        if (monthly_rate > 0) {
-            loan.monthly_payment = static_cast<RUB>(
-                loan.remaining_balance *
-                (monthly_rate * pow(1 + monthly_rate, loan.term_months)) /
-                (pow(1 + monthly_rate, loan.term_months) - 1)
-                );
-        }
-        else {
-            loan.monthly_payment = loan.remaining_balance / loan.term_months;
-        }
+    int last_phone_purchase_year = 0;
+    bool has_phone = false;
+    bool can_buy_new_phone(int current_year) const {
+        if (!has_phone) return true;
+        return (current_year - last_phone_purchase_year) >= 2;
     }
 };
 
@@ -139,10 +121,10 @@ bool check_chance(int chance_percent) {
     return distrib(gen) <= chance_percent;
 }
 
+
 void alice_oge(const int year, const int month) {
     if (year != 2035 || month != 6 || alice.status != LifeStatus::SCHOOL) return;
 
-    std::cout << "\n  [ЭКЗАМЕН] " << year << " год: Элис сдаёт ОГЭ!\n";
 
     int total_oge_score = 0;
     for (int i = 1; i <= 4; ++i) {
@@ -163,25 +145,23 @@ void alice_oge(const int year, const int month) {
 
     if (alice.oge_average > 3.1) {
         alice.current_activity = "Учится в 10 классе";
-        std::cout << "  [РЕШЕНИЕ] Элис проходит в 10 класс!\n";
+        std::cout << "Элис проходит в 10 класс!\n";
     }
     else if (alice.oge_average >= 2.5) {
         alice.status = LifeStatus::COLLEGE;
         alice.current_activity = "Учится в колледже";
-        std::cout << "  [РЕШЕНИЕ] Элис поступает в колледж.\n";
+        std::cout << "Элис поступает в колледж.\n";
     }
     else {
         alice.status = LifeStatus::WORKING;
         alice.education = EducationLevel::NONE;  
         alice.current_activity = "Работает (без образования)";
-        std::cout << "  [РЕШЕНИЕ] Провал ОГЭ. Элис идет работать.\n";
+        std::cout << "Провал ОГЭ. Элис идет работать.\n";
     }
 }
 
 void alice_ege(const int year, const int month) {
     if (year != 2037 || month != 6 || alice.status != LifeStatus::SCHOOL) return;
-
-    std::cout << "\n  [ЭКЗАМЕН] " << year << " год: Элис сдаёт ЕГЭ!\n";
 
     int total_ege_score = 0;
     for (int i = 1; i <= 3; ++i) {
@@ -195,13 +175,13 @@ void alice_ege(const int year, const int month) {
     if (alice.ege_total > 170) {
         alice.status = LifeStatus::UNIVERSITY;
         alice.current_activity = "Учится в университете";
-        std::cout << "  [РЕШЕНИЕ] Элис поступает в университет!\n";
+        std::cout << "Элис поступает в университет!\n";
     }
     else {
         alice.status = LifeStatus::WORKING;
         alice.education = EducationLevel::SCHOOL;  
         alice.current_activity = "Работает (школа)";
-        std::cout << "  [РЕШЕНИЕ] Баллов не хватило. Элис идет работать.\n";
+        std::cout << "Баллов не хватило. Элис идет работать.\n";
     }
 }
 
@@ -215,7 +195,7 @@ void alice_college(const int year, const int month) {
         alice.status = LifeStatus::WORKING;
         alice.education = EducationLevel::COLLEGE;  
         alice.current_activity = "Работает (колледж)";
-        std::cout << "\n  [СОБЫТИЕ] " << year << " год: Элис окончила колледж!\n";
+        std::cout << "\n " << year << " год: Элис окончила колледж!\n";
     }
 }
 
@@ -228,7 +208,7 @@ void alice_university(const int year, const int month) {
         alice.status = LifeStatus::WORKING;
         alice.education = EducationLevel::UNIVERSITY;  
         alice.current_activity = "Работает (университет)";
-        std::cout << "\n  [СОБЫТИЕ] " << year << " год: Элис получила диплом ВУЗа!\n";
+        std::cout << "\n" << year << " год: Элис получила диплом ВУЗа!\n";
     }
 }
 
@@ -246,7 +226,7 @@ void alice_car(const int year, const int month) {
     if (!alice.car.has_car) {
         if (year >= 2038 && alice.cash >= 600000) {
             if (check_chance(15)) {
-                // Инициализируем машину при покупке
+
                 alice.car.has_car = true;
                 alice.car.model = "Suzuki Swift";
                 alice.car.health = 100;
@@ -256,7 +236,7 @@ void alice_car(const int year, const int month) {
 
                 alice.cash -= alice.car.purchase_price;
 
-                std::cout << "  [СОБЫТИЕ] Элис купила " << alice.car.model
+                std::cout << "Элис купила " << alice.car.model
                     << " за " << alice.car.purchase_price << "\n";
             }
         }
@@ -267,22 +247,19 @@ void alice_car(const int year, const int month) {
 
         alice.car.age_months++;
 
-        // Базовый шанс 3%, плюс 1% за каждые 10% износа, плюс 0.5% за каждый год владения
         int wear_factor = (100 - alice.car.health) / 10;
-        int age_factor = alice.car.age_months / 12; // полных лет владения
+        int age_factor = alice.car.age_months / 12; 
         int breakdown_chance = 3 + wear_factor + age_factor;
 
-        // Ограничим максимум, чтобы машина не ломалась каждый месяц
         breakdown_chance = (std::min)(breakdown_chance, 25);
 
         if (check_chance(breakdown_chance)) {
-            //тип ремонта: лёгкий: 55%, сложный: 30%, капитальный: 15%
             int repair_roll = rand() % 100;
 
             if (repair_roll < 55) {
                 alice.cash -= alice.car.light_repair_cost;
                 alice.car.health -= 2;
-                std::cout << "  [РЕМОНТ] Лёгкий ремонт " << alice.car.model
+                std::cout << "Лёгкий ремонт " << alice.car.model
                     << " (-" << alice.car.light_repair_cost
                     << "). Состояние: " << alice.car.health << "%" << "\n";
             }
@@ -290,7 +267,7 @@ void alice_car(const int year, const int month) {
             else if (repair_roll < 85) {
                 alice.cash -= alice.car.heavy_repair_cost;
                 alice.car.health -= 10;
-                std::cout << "  [РЕМОНТ] Сложный ремонт " << alice.car.model
+                std::cout << "Сложный ремонт " << alice.car.model
                     << " (-" << alice.car.heavy_repair_cost
                     << "). Состояние: " << alice.car.health << "%" << "\n";
             }
@@ -298,13 +275,13 @@ void alice_car(const int year, const int month) {
             else {
                 alice.cash -= alice.car.capital_repair_cost;
                 alice.car.health -= 25;
-                std::cout << "  [РЕМОНТ] КАПИТАЛЬНЫЙ ремонт " << alice.car.model
+                std::cout << "Капитальный ремонт " << alice.car.model
                     << " (-" << alice.car.capital_repair_cost
                     << "). Состояние: " << alice.car.health << "%" << "\n";
             }
 
             if (alice.car.health <= 0) {
-                std::cout << "  [СОБЫТИЕ] Машина " << alice.car.model
+                std::cout << " Машина " << alice.car.model
                     << " окончательно сломалась и отправлена на свалку." << "\n";
 
                 alice.car.has_car = false;
@@ -318,7 +295,6 @@ void alice_car(const int year, const int month) {
 RUB calculate_salary_by_education(EducationLevel edu, int experience_months) {
     RUB base_salary = 0;
 
-    //базовая зарплата в зависимости от образования
     switch (edu) {
     case EducationLevel::NONE:
         base_salary = 25000; 
@@ -334,7 +310,6 @@ RUB calculate_salary_by_education(EducationLevel edu, int experience_months) {
         break;
     }
 
-    //индексация зарплаты с опытом работы
     int years_worked = experience_months / 12;
     double experience_bonus = 1.0 + (years_worked * 0.02);
 
@@ -362,7 +337,6 @@ void alice_salary(const int year, const int month) {
         return;
     }
 
-    // начисление зарплаты с вычетом налога
     if (gross_salary > 0) {
         RUB tax = static_cast<RUB>(gross_salary * alice.bank.tax_rate);
         net_salary = gross_salary - tax;
@@ -370,13 +344,131 @@ void alice_salary(const int year, const int month) {
         alice.cash += net_salary;
         alice.bank.tax_paid_total += tax;
 
-        // Логируем раз в год
-        if (month == 1) {
-            std::cout << "  [ЗАРПЛАТА] " << year << " год: " << gross_salary
-                << " руб. (налог: " << tax << ", на руки: " << net_salary
-                << ", опыт: " << alice.work_experience_months / 12 << " лет)\n";
+    }
+}
+
+void alice_try_phone_loan(const int year, const int month) {
+    if (alice.status != LifeStatus::WORKING) return;
+    if (alice.bank.loan.is_active) return;
+
+    if (!alice.can_buy_new_phone(year)) {
+        return;
+    }
+
+    const RUB phone_price = 150000;
+    if (alice.cash >= phone_price) return;
+    if (!check_chance(5)) return;
+
+    const double loan_rate = 15.0;
+    const int loan_term_months = 24;
+
+    RUB monthly_payment = Bank::calculate_annuity_payment(
+        phone_price, loan_rate, loan_term_months
+    );
+
+    alice.bank.loan.is_active = true;
+    alice.bank.loan.total_amount = phone_price;
+    alice.bank.loan.remaining_balance = phone_price;
+    alice.bank.loan.annual_rate = loan_rate;
+    alice.bank.loan.term_months = loan_term_months;
+    alice.bank.loan.months_paid = 0;
+    alice.bank.loan.monthly_payment = monthly_payment;
+
+    alice.cash -= phone_price;
+    alice.has_phone = true;
+    alice.last_phone_purchase_year = year;
+
+    std::cout << " Кредит" << year << " год: Элис взяла кредит на телефон! Платеж: "
+        << monthly_payment << " руб.\n";
+}
+
+void alice_try_mortgage(const int year, const int month) {
+    if (alice.status != LifeStatus::WORKING) return;
+
+    if (alice.bank.mortgage.is_active) return;
+
+    int age = alice.get_age(year);
+    if (age < 25) return;
+
+    const RUB mortgage_amount = 3000000;
+    const double mortgage_rate = 8.5;
+    const int mortgage_term_years = 20;
+
+    double monthly_rate = mortgage_rate / 100.0 / 12.0;
+    int term_months = mortgage_term_years * 12;
+    RUB estimated_payment = static_cast<RUB>(
+        mortgage_amount *
+        (monthly_rate * pow(1 + monthly_rate, term_months)) /
+        (pow(1 + monthly_rate, term_months) - 1)
+        );
+
+
+    if (alice.salary < estimated_payment * 2) {
+        return;
+    }
+
+    if (!check_chance(15)) return;
+
+    alice.bank.mortgage.is_active = true;
+    alice.bank.mortgage.total_amount = mortgage_amount;
+    alice.bank.mortgage.remaining_balance = mortgage_amount;
+    alice.bank.mortgage.annual_rate = mortgage_rate;
+    alice.bank.mortgage.term_months = term_months;
+    alice.bank.mortgage.months_paid = 0;
+    alice.bank.mortgage.monthly_payment = estimated_payment;
+
+    std::cout << year << " год (возраст " << age
+        << "): Элис решила взять ипотеку!\n";
+    std::cout << "    Сумма: " << mortgage_amount << " руб., ставка: "
+        << mortgage_rate << "%, срок: " << mortgage_term_years << " лет\n";
+    std::cout << "    Ежемесячный платеж: " << estimated_payment << " руб.\n";
+    std::cout << "    Зарплата: " << alice.salary << " руб. (в "
+        << (alice.salary / estimated_payment) << " раз выше платежа)\n";
+}
+
+void alice_pay_mortgage(const int year, const int month) {
+    if (!alice.bank.mortgage.is_active) return;
+
+    if (alice.cash >= alice.bank.mortgage.monthly_payment) {
+        alice.cash -= alice.bank.mortgage.monthly_payment;
+        alice.bank.mortgage.remaining_balance -= alice.bank.mortgage.monthly_payment;
+        alice.bank.mortgage.months_paid++;
+
+        if (alice.bank.mortgage.remaining_balance <= 0) {
+            alice.bank.mortgage.is_active = false;
+            alice.bank.mortgage.remaining_balance = 0;
+            std::cout << " Ипотека полностью погашена в " << year << " году!\n";
         }
     }
+    else {
+        std::cout << "Недостаточно средств для оплаты ипотеки в " << year << " году!\n";
+    }
+}
+
+void alice_pay_loan(const int year, const int month) {
+    if (!alice.bank.loan.is_active) return;
+
+    if (alice.cash >= alice.bank.loan.monthly_payment) {
+        alice.cash -= alice.bank.loan.monthly_payment;
+        alice.bank.loan.remaining_balance -= alice.bank.loan.monthly_payment;
+        alice.bank.loan.months_paid++;
+
+        if (alice.bank.loan.remaining_balance <= 0) {
+            alice.bank.loan.is_active = false;
+            alice.bank.loan.remaining_balance = 0;
+            std::cout << "Кредит полностью погашен в " << year << " году!\n";
+        }
+    }
+    else {
+        std::cout << "Недостаточно средств для оплаты кредита в " << year << " году!\n";
+    }
+}
+
+
+void alice_food(const int year, const int month) {
+    const RUB food_cost = 20000;
+
+    alice.cash -= food_cost;
 }
 
 void simulation() {
@@ -386,10 +478,13 @@ void simulation() {
         alice_education(year, month);
         alice_salary(year, month);
         alice_car(year, month);
-        //alice_mortgadge();
+        alice_try_mortgage(year, month);
+        alice_try_phone_loan(year, month);
+        alice_pay_mortgage(year, month);
+        alice_pay_loan(year, month);
         //alice_rent();
         //alice_home_bills();
-        //alice_food();
+        alice_food(year, month);
         //alice_dog();
         //alice_bank_income();
         ++month;
@@ -409,16 +504,15 @@ void alice_init() {
     alice.is_well_off_family = check_chance(50);
 
     if (alice.is_well_off_family) {
-        std::cout << "[СТАРТ] Элис родилась в благополучной семье. Родители помогают с учебой.\n";
+        std::cout << "Элис родилась в благополучной семье. Родители помогают с учебой.\n";
         alice.cash += 50000;
     }
     else {
-        std::cout << "[СТАРТ] Элис родилась в обычной семье. Всего придется добиваться самой.\n";
+        std::cout << "Элис родилась в обычной семье. Всего придется добиваться самой.\n";
     }
 }
 
 void alice_printf() {
-    std::cout << "\n--- ИТОГОВОЕ СОСТОЯНИЕ ЭЛИС ---\n";
     std::cout << "Текущий статус:   " << alice.current_activity << "\n";
     std::cout << "Зарплата:         " << alice.salary << " руб./мес.\n";
     std::cout << "Накопления:       " << alice.cash << " руб.\n";
