@@ -178,7 +178,7 @@ void alice_depression(){
 
 
 void alice_die_from_sickness(){
-    if (alice.health = 0) {
+    if (alice.health == 0) {
         alice.alive = false;
 
         printf("Alice is dead. Simulation over.\n");
@@ -232,7 +232,7 @@ void alice_savings(){
 void alice_alpha_bank(){
     
     if (AlphaBank.alice_deposit > 0) {
-        const RUB interest = AlphaBank.alice_deposit * AlphaBank.alice_interest_rate / 100;
+        const RUB interest = AlphaBank.alice_deposit * AlphaBank.alice_interest_rate / (12 *100);
         AlphaBank.alice_deposit += interest;
         printf("Alice earned %llu from her deposit\n", interest);
     }
@@ -297,7 +297,7 @@ void alice_car_break(){
             smartik.broken = false;
 
             // Start a new breakdown cycle
-            smartik.break_chance = 0.01;
+            smartik.break_chance = 0.0025;
 
             printf("Car repair spent = %llu\n",
                    smartik.current_repair_cost);
@@ -314,7 +314,7 @@ void alice_car_break(){
 
         // Car did not break this month,
         // so the breakdown chance increases
-        smartik.break_chance += 0.005;
+        smartik.break_chance += 0.0025;
 
         if (smartik.break_chance > 1.0) {
             smartik.break_chance = 1.0;
@@ -425,6 +425,10 @@ void simulation(){
 
         bublik_age();
 
+        // if (!bublik.exist)  {
+        //     printf("Now is %d\n", year);
+        // }
+
 
         // Future aspects of life:
 
@@ -466,7 +470,7 @@ void smartik_init(){
     smartik.total_repair_spent = 0;
     smartik.current_repair_cost = 0;
 
-    smartik.break_chance = 0.01;
+    smartik.break_chance = 0.0025;
 
     smartik.broken = false;
 }
@@ -491,6 +495,7 @@ void alice_init(){
     alice.total_transport_spent = 0;
     alice.total_hospital_spent = 0;
 
+    alice.alive = true;
 
     bublik_init();
     smartik_init();
