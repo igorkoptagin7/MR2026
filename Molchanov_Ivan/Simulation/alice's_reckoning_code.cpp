@@ -1,6 +1,7 @@
 #include <stdio.h>  //не запускается через run; 
 #include <stdlib.h>
 #include <time.h>
+#include <random.h>
 using RUB = int;
 
 struct Person{
