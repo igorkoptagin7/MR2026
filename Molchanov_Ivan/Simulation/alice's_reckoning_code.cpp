@@ -46,7 +46,7 @@ void print_output(Person& alice)
 
 void car_breaking(Person& alice) //CAR BREAKING RANDOM
 {
-    if (rand() % 100 < 10){ //10% chance of breaking
+    if (d(rng) <= 10) { //10% chance of breaking
         alice.cash -= 50'000;
     }
 }
@@ -107,7 +107,8 @@ void simulation(Person& alice)
 // MAIN 
 int main()
 {
-    srand(time(NULL));
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int> d(1, 100);
     
     struct Person alice;
 
